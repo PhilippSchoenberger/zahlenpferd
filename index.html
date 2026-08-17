@@ -204,6 +204,10 @@ canvas#konfetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:non
 }
 .tipp svg{display:block;margin:9px auto 2px;max-width:100%;height:auto}
 .echo{font-family:var(--display);font-weight:800;font-size:24px;margin-top:10px}
+#weiterKnopf{margin-top:14px}
+/* Während der Erklärung steht die Uhr still — das muss man sehen. */
+.zeitbalken.pausiert i{background:repeating-linear-gradient(45deg,#c9c2b4 0 7px,#b8b0a0 7px 14px)}
+.uhr.pausiert{color:#7a6e5e}
 
 .tastenfeld{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .taste{
@@ -397,8 +401,9 @@ summary{font-family:var(--display);font-weight:800;cursor:pointer;font-size:15px
           <div class="neu-fahne" id="neuFahne" hidden>NEU</div>
           <div class="term" id="term">7 <span class="mal">×</span> 8</div>
           <div class="eingabe leer" id="eingabe">&nbsp;<span class="caret"></span></div>
-          <div class="tipp" id="tippBox" hidden></div>
           <div class="echo" id="echo" hidden></div>
+          <div class="tipp" id="tippBox" hidden></div>
+          <button class="knopf gross weide" id="weiterKnopf" hidden>Verstanden — weiter</button>
         </div>
 
         <div class="tastenfeld" id="tastenfeld">
@@ -909,8 +914,12 @@ function fuelleWarteschlange(erst){
 function starteRunde(){
   ac();
   R = {queue:[], n:0, r:0, combo:0, comboBest:0, xp:0, neuHeute:0, runden:0, imParcours:0,
-       endeUm: Date.now() + st.ein.minuten*60000, start: Date.now(), letzterK:null};
+       endeUm: Date.now() + st.ein.minuten*60000, start: Date.now(), letzterK:null,
+       pause:false, pauseSeit:0, pauseGesamt:0};
   clearTimeout(weiterTimer); weiterTimer = null;
+  $("#zeitbalken").classList.remove("pausiert");
+  $("#uhr").classList.remove("pausiert");
+  $("#weiterKnopf").hidden = true;
   fuelleWarteschlange(true);
   $("#startKarte").hidden = true;
   $("#endKarte").hidden = true;
@@ -949,6 +958,7 @@ function bewegeLaeufer(){
 }
 
 function tick(){
+  if(R.pause) return;                              // Erklärung wird gelesen
   const rest = (R.endeUm - Date.now())/1000;
   $("#uhr").textContent = mmss(rest);
   const bar = $("#zeitbalken");
@@ -975,6 +985,7 @@ function stelleAufgabe(k){
   $("#aufgabe").className = "aufgabe" + (k.neu ? " neu" : "");
   $("#tippBox").hidden = true;
   $("#echo").hidden = true;
+  $("#weiterKnopf").hidden = true;
   eingabe = ""; tippGenutzt = false; gesperrt = false;
   zeichneEingabe();
   kartenStart = Date.now();
@@ -992,7 +1003,14 @@ function tippe(z){
 function loesche(){ if(gesperrt) return; eingabe = eingabe.slice(0,-1); tTaste(); zeichneEingabe(); }
 
 function pruefe(){
-  if(gesperrt){                                   // nach der Rückmeldung ist OK das Weiter
+  if(gesperrt){
+    // Nach einem Fehler wartet die Erklärung auf eine bewusste Bestätigung.
+    // Die Sperre von 1,2 s verhindert, dass ein reflexhaftes zweites OK
+    // direkt nach der Eingabe sie gleich wieder wegwischt.
+    if(!$("#weiterKnopf").hidden){
+      if(Date.now() - feedbackSeit > 1200) weiterMachen();
+      return;
+    }
     if(R && Date.now() - feedbackSeit > 600){ clearTimeout(weiterTimer); naechsteKarte(); }
     return;
   }
@@ -1032,11 +1050,14 @@ function pruefe(){
     R.combo = 0;
     $("#aufgabe").classList.add("falsch");
     const e = $("#echo"); e.hidden = false;
-    e.innerHTML = (erste ? "Neue Aufgabe — " : "") + karte.a + " × " + karte.b + " = <b>" + soll + "</b>"
-      + '<div style="font-size:13px;font-weight:700;color:#7a6e5e;margin-top:6px">OK drücken für weiter</div>';
+    e.innerHTML = (erste ? "Neue Aufgabe — " : "") + karte.a + " × " + karte.b + " = <b>" + soll + "</b>";
     zeigeHilfe(karte.a, karte.b);
     tFalsch();
     R.queue.splice(Math.min(3, R.queue.length), 0, {k:karte.k, a:karte.a, b:karte.b, neu:false});
+    // Erklärung in Ruhe lesen: die Uhr steht still, bis bewusst
+    // weitergetippt wird. Nichts läuft von allein weiter.
+    pausiere();
+    $("#weiterKnopf").hidden = false;
   }
 
   if(parcoursVoll){
@@ -1051,7 +1072,31 @@ function pruefe(){
   aktualisiereHud();
   sichern();
   clearTimeout(weiterTimer);
-  weiterTimer = setTimeout(naechsteKarte, ok ? (parcoursVoll ? 1700 : 650) : 4000);
+  weiterTimer = ok ? setTimeout(naechsteKarte, parcoursVoll ? 1700 : 650) : null;
+}
+
+/* Uhr anhalten und wieder anwerfen. Die Pausenzeit wird mitgezählt,
+   damit sie nicht als Übungszeit in der Statistik landet. */
+function pausiere(){
+  if(!R || R.pause) return;
+  R.pause = true; R.pauseSeit = Date.now();
+  $("#zeitbalken").classList.add("pausiert");
+  $("#uhr").classList.add("pausiert");
+  $("#uhr").textContent = "Pause";
+}
+function weiterMachen(){
+  if(!R) return;
+  if(R.pause){
+    const dauer = Date.now() - R.pauseSeit;
+    R.endeUm += dauer;
+    R.pauseGesamt += dauer;
+    R.pause = false;
+    $("#zeitbalken").classList.remove("pausiert");
+    $("#uhr").classList.remove("pausiert");
+  }
+  $("#weiterKnopf").hidden = true;
+  clearTimeout(weiterTimer);
+  naechsteKarte();
 }
 
 function bewerte(k, ok, ms, mitTipp){
@@ -1087,7 +1132,10 @@ function beendeRunde(){
   if(!R) return;
   clearInterval(uhrId); uhrId = null;
   clearTimeout(weiterTimer); weiterTimer = null;
-  const dauer = Math.min(Date.now() - R.start, st.ein.minuten*60000 + 60000);
+  // Lesepausen zählen nicht als Übungszeit
+  const pauseJetzt = R.pause ? Date.now() - R.pauseSeit : 0;
+  const dauer = Math.min(Date.now() - R.start - R.pauseGesamt - pauseJetzt,
+                         st.ein.minuten*60000 + 60000);
   const runde = {n:R.n, r:R.r, xp:R.xp, comboBest:R.comboBest, neu:R.neuHeute,
                  parcours:R.runden, sek:Math.round(dauer/1000)};
   const rangVorher = rang(st.xp - R.xp);
@@ -1684,7 +1732,11 @@ $("#tippKnopf").onclick = () => {
   tippGenutzt = true;
   zeigeHilfe(karte.a, karte.b);
 };
-$("#aufgabe").addEventListener("click", () => {
+$("#weiterKnopf").onclick = weiterMachen;
+$("#aufgabe").addEventListener("click", ev => {
+  if(ev.target.closest("#weiterKnopf")) return;
+  // Solange die Erklärung steht, wischt ein Tipp auf die Karte sie nicht weg.
+  if(!$("#weiterKnopf").hidden) return;
   if(gesperrt && R && Date.now() - feedbackSeit > 600){ clearTimeout(weiterTimer); naechsteKarte(); }
 });
 $("#tastenfeld").addEventListener("click", ev => {
@@ -1704,7 +1756,7 @@ addEventListener("keydown", ev => {
 });
 let versteckSeit = 0;
 document.addEventListener("visibilitychange", () => {
-  if(!R) return;
+  if(!R || R.pause) return;          // in der Lesepause steht die Uhr ohnehin
   if(document.hidden) versteckSeit = Date.now();
   else if(versteckSeit){ R.endeUm += Date.now() - versteckSeit; versteckSeit = 0; }
 });
