@@ -1,0 +1,1806 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zahlenpferd</title>
+<!-- Auf dem iPad über „Teilen → Zum Home-Bildschirm“ wird daraus eine
+     eigenständige App. Das ist nicht nur Kosmetik: iOS räumt den Speicher
+     von Home-Bildschirm-Apps nicht nach ein paar Tagen weg. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Zahlenpferd">
+<meta name="theme-color" content="#f7f3e8">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+/* ------------------------------------------------------------------
+   Zahlenpferd — Risodruck-Reitstall
+   Bewusst eine einzige visuelle Welt (bedrucktes Papier), deshalb kein
+   Dark-Mode. Alle Farben sind explizit gesetzt, damit die Seite auf
+   jedem Untergrund gleich aussieht.
+------------------------------------------------------------------- */
+:root{
+  --papier:#f7f3e8;
+  --karte:#fffdf7;
+  --tinte:#2a2118;
+  --tinte-50:#2a211880;
+  --tinte-15:#2a211826;
+  --weide:#3d9a5f;
+  --leder:#a5542a;
+  --heu:#f0b429;
+  --himmel:#4a9fd8;
+  --schleife:#e2557a;
+
+  --w0:#e6ded0;   /* kahle Erde — noch nicht dran */
+  --w1:#e8b9a0;   /* wackelig    */
+  --w2:#ddd08a;   /* im Aufbau   */
+  --w3:#a8d18a;   /* sitzt       */
+  --w4:#5fb573;   /* sicher      */
+  --w5:#2f8a52;   /* Meisterfach */
+
+  --display:ui-rounded,"SF Pro Rounded","Hiragino Maru Gothic ProN",Nunito,Quicksand,system-ui,sans-serif;
+  --body:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+
+  --rand:2.5px solid var(--tinte);
+  --schatten:4px 4px 0 var(--tinte);
+  --schatten-l:6px 6px 0 var(--tinte);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--papier);
+  color:var(--tinte);
+  font-family:var(--body);
+  font-size:16px;line-height:1.5;
+  -webkit-text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;
+}
+/* Riso-Korn */
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:60;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode:multiply;opacity:.10;
+}
+canvas#konfetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:55}
+
+.app{position:relative;z-index:1;max-width:560px;margin:0 auto;padding:18px 16px 56px}
+.app.weit{max-width:980px}
+
+/* ---------- Kopf ---------- */
+.top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.brand{display:flex;align-items:center;gap:9px;font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.02em}
+.brand-mark{
+  display:grid;place-items:center;width:34px;height:34px;border:var(--rand);border-radius:11px;
+  background:var(--heu);box-shadow:3px 3px 0 var(--tinte);transform:rotate(-4deg);overflow:hidden
+}
+.brand-mark svg{width:30px;height:24px;margin-top:2px}
+.top-chips{display:flex;gap:8px;margin-left:auto;align-items:center;flex-wrap:wrap}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;
+  border:var(--rand);border-radius:999px;background:var(--karte);
+  padding:5px 12px;font-family:var(--display);font-weight:700;font-size:14px;
+  box-shadow:3px 3px 0 var(--tinte);white-space:nowrap
+}
+.chip b{font-variant-numeric:tabular-nums}
+.chip.flamme{background:var(--heu)}
+.chip.karotte{background:#ffd9c2}
+.chip-btn{cursor:pointer;font-size:15px;padding:5px 11px}
+.chip-btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--tinte)}
+
+/* ---------- Reiter ---------- */
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{
+  flex:1;cursor:pointer;font-family:var(--display);font-weight:800;font-size:15px;
+  border:var(--rand);border-radius:14px;background:var(--karte);color:var(--tinte);
+  padding:9px 6px;box-shadow:3px 3px 0 var(--tinte);transition:transform .08s,box-shadow .08s
+}
+.tab:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--tinte)}
+.tab.is-on{background:var(--weide);color:#fff}
+
+/* ---------- Karten ---------- */
+.karte{
+  border:var(--rand);border-radius:22px;background:var(--karte);
+  box-shadow:var(--schatten-l);padding:20px;margin-bottom:16px
+}
+.karte h2{font-family:var(--display);font-size:19px;font-weight:800;margin:0 0 4px;letter-spacing:-.01em}
+.karte p.lead{margin:0 0 14px;color:#5a5044;font-size:15px}
+.abschnitt-titel{
+  font-family:var(--display);font-weight:800;font-size:13px;letter-spacing:.09em;
+  text-transform:uppercase;color:#7a6e5e;margin:0 0 10px
+}
+
+/* ---------- Knöpfe ---------- */
+.knopf{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font-family:var(--display);font-weight:800;font-size:17px;
+  border:var(--rand);border-radius:16px;background:var(--karte);color:var(--tinte);
+  padding:13px 20px;cursor:pointer;box-shadow:var(--schatten);
+  transition:transform .08s,box-shadow .08s;touch-action:manipulation
+}
+.knopf:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--tinte)}
+.knopf.gross{width:100%;font-size:20px;padding:17px 20px}
+.knopf.weide{background:var(--weide);color:#fff}
+.knopf.leder{background:var(--leder);color:#fff}
+.knopf.heu{background:var(--heu)}
+.knopf.schleife{background:var(--schleife);color:#fff}
+.knopf.schmal{font-size:14px;padding:8px 14px;border-radius:12px;box-shadow:3px 3px 0 var(--tinte)}
+.knopf-reihe{display:flex;gap:10px;flex-wrap:wrap}
+.knopf-reihe .knopf{flex:1;min-width:130px}
+:focus-visible{outline:3px solid var(--himmel);outline-offset:3px}
+
+/* ---------- Turnierbahn ---------- */
+.bahn{
+  position:relative;height:96px;border:var(--rand);border-radius:18px;overflow:hidden;
+  background:linear-gradient(#cfe8f5 0 52%, #86c26a 52% 100%);
+  box-shadow:var(--schatten);margin-bottom:12px
+}
+.bahn .sonne{position:absolute;top:8px;right:14px;width:22px;height:22px;border-radius:50%;background:var(--heu);border:2.5px solid var(--tinte)}
+.huerde{position:absolute;bottom:30%;width:24px;height:32px;transform:translateX(-50%)}
+.huerde b{position:absolute;top:0;bottom:-4px;width:4px;background:var(--tinte);border-radius:2px}
+.huerde b:nth-of-type(1){left:0}
+.huerde b:nth-of-type(2){right:0}
+.huerde i{position:absolute;left:1px;right:1px;height:5px;background:var(--karte);border:2px solid var(--tinte);border-radius:2px}
+.huerde i:nth-of-type(1){top:0}
+.huerde i:nth-of-type(2){top:12px;background:var(--schleife)}
+.huerde i:nth-of-type(3){top:24px}
+.huerde.weg{opacity:.3}
+.laeufer{
+  position:absolute;bottom:8px;width:62px;transform:translateX(-50%);
+  transition:left .45s cubic-bezier(.4,1.4,.5,1)
+}
+.laeufer svg{width:100%;height:auto;display:block}
+.laeufer.springt{animation:sprung .55s ease-out}
+@keyframes sprung{0%{transform:translateX(-50%) translateY(0) rotate(0)}
+ 40%{transform:translateX(-50%) translateY(-30px) rotate(-9deg)}
+ 100%{transform:translateX(-50%) translateY(0) rotate(0)}}
+.bahn-text{
+  position:absolute;top:7px;left:12px;font-family:var(--display);font-weight:800;font-size:12.5px;
+  background:var(--karte);border:2px solid var(--tinte);border-radius:999px;padding:1px 9px
+}
+
+.hud{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.zeitbalken{flex:1;height:20px;border:var(--rand);border-radius:999px;background:var(--karte);overflow:hidden;box-shadow:3px 3px 0 var(--tinte)}
+.zeitbalken i{display:block;height:100%;background:var(--himmel);width:100%;transition:width .3s linear}
+.zeitbalken.knapp i{background:var(--schleife)}
+.uhr{font-family:var(--mono);font-weight:700;font-size:16px;font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+.zaehler{display:flex;gap:8px;margin-bottom:12px}
+.zaehler .chip{flex:1;justify-content:center;box-shadow:3px 3px 0 var(--tinte)}
+
+/* ---------- Aufgabe ---------- */
+.aufgabe{
+  border:var(--rand);border-radius:22px;background:var(--karte);
+  box-shadow:var(--schatten-l);padding:20px 18px;text-align:center;margin-bottom:14px;
+  position:relative;overflow:hidden
+}
+/* Reihenfolge zählt: die Rückmeldung muss die Neu-Färbung übermalen. */
+.aufgabe.neu{background:#fdf0cf}
+.aufgabe.richtig{background:#dff3e3}
+.aufgabe.falsch{background:#fde3e8}
+.neu-fahne{
+  position:absolute;top:13px;left:-36px;transform:rotate(-45deg);
+  background:var(--schleife);color:#fff;font-family:var(--display);font-weight:800;font-size:12px;
+  letter-spacing:.08em;padding:4px 42px;border-top:2.5px solid var(--tinte);border-bottom:2.5px solid var(--tinte)
+}
+.term{font-family:var(--display);font-weight:800;letter-spacing:-.03em;font-size:clamp(42px,12.5vw,62px);line-height:1.05;font-variant-numeric:tabular-nums}
+.term .mal{color:var(--leder);padding:0 .12em}
+.eingabe{
+  margin:14px auto 0;min-height:62px;width:min(230px,80%);
+  border:var(--rand);border-radius:16px;background:var(--papier);
+  display:grid;place-items:center;
+  font-family:var(--display);font-weight:800;font-size:38px;font-variant-numeric:tabular-nums;
+  box-shadow:inset 3px 3px 0 var(--tinte-15)
+}
+.eingabe.leer{color:var(--tinte-50)}
+.caret{display:inline-block;width:3px;height:.82em;background:var(--tinte);margin-left:3px;vertical-align:-.06em;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.tipp{
+  margin:12px 0 0;font-family:var(--display);font-weight:700;font-size:15.5px;
+  background:var(--heu);border:var(--rand);border-radius:14px;padding:10px 12px;
+  box-shadow:3px 3px 0 var(--tinte)
+}
+.tipp svg{display:block;margin:9px auto 2px;max-width:100%;height:auto}
+.echo{font-family:var(--display);font-weight:800;font-size:24px;margin-top:10px}
+
+.tastenfeld{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.taste{
+  font-family:var(--display);font-weight:800;font-size:26px;
+  border:var(--rand);border-radius:16px;background:var(--karte);color:var(--tinte);
+  padding:14px 0;cursor:pointer;box-shadow:var(--schatten);
+  transition:transform .07s,box-shadow .07s;touch-action:manipulation;user-select:none
+}
+.taste:active{transform:translate(3px,3px);box-shadow:1px 1px 0 var(--tinte)}
+.taste.ok{background:var(--weide);color:#fff;font-size:20px}
+.taste.weg{background:var(--leder);color:#fff;font-size:22px}
+.unterzeile{display:flex;gap:10px;margin-top:12px}
+.unterzeile .knopf{flex:1}
+
+/* ---------- Werte ---------- */
+.werte{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:16px 0}
+.wert{border:var(--rand);border-radius:16px;padding:12px;background:var(--papier);box-shadow:3px 3px 0 var(--tinte)}
+.wert .z{font-family:var(--display);font-weight:800;font-size:27px;line-height:1.1;font-variant-numeric:tabular-nums}
+.wert .l{font-size:12px;font-family:var(--display);font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#7a6e5e}
+.wert.gut{background:#dff3e3}
+.wert.gold{background:#fdf0cf}
+.jubel{font-family:var(--display);font-weight:800;font-size:clamp(25px,6.6vw,34px);letter-spacing:-.02em;margin:0 0 4px}
+
+/* ---------- Pony ---------- */
+.pony-buehne{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.pony-buehne .bild{width:104px;flex:none}
+.pony-buehne .bild svg{width:100%;height:auto;display:block}
+.pony-name{font-family:var(--display);font-weight:800;font-size:20px;margin:0}
+.pony-sub{font-size:13.5px;color:#5a5044;margin:2px 0 0}
+
+.stall{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:12px}
+.box{
+  border:var(--rand);border-radius:18px;background:var(--karte);padding:10px;text-align:center;
+  box-shadow:3px 3px 0 var(--tinte);cursor:pointer
+}
+.box.zu{border-style:dashed;box-shadow:none;background:transparent;cursor:default}
+.box.aktiv{background:#dff3e3;box-shadow:3px 3px 0 var(--weide),0 0 0 2.5px var(--weide)}
+.box svg{width:100%;height:auto;display:block}
+.box.zu svg{opacity:.16;filter:grayscale(1)}
+.box .n{font-family:var(--display);font-weight:800;font-size:14.5px;margin-top:4px}
+.box .b{font-size:11px;color:#7a6e5e;line-height:1.35;margin-top:2px}
+.box .marke{font-family:var(--display);font-weight:800;font-size:11px;color:var(--weide);margin-top:3px}
+
+/* ---------- Koppel ---------- */
+.karte20{overflow-x:auto;padding-bottom:6px}
+.gitter{display:grid;gap:2px;min-width:400px}
+.gz{font-family:var(--mono);font-size:9px;color:#7a6e5e;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.zelle{aspect-ratio:1;border-radius:3px;background:var(--w0);border:1px solid #00000012}
+.zelle[data-s="1"]{background:var(--w1)}
+.zelle[data-s="2"]{background:var(--w2)}
+.zelle[data-s="3"]{background:var(--w3)}
+.zelle[data-s="4"]{background:var(--w4)}
+.zelle[data-s="5"]{background:var(--w5);box-shadow:inset 0 0 0 1.5px #ffffff66}
+.legende{display:flex;flex-wrap:wrap;gap:12px;margin-top:14px;font-size:12.5px;color:#5a5044}
+.legende span{display:inline-flex;align-items:center;gap:6px}
+.legende i{width:14px;height:14px;border-radius:4px;border:1.5px solid var(--tinte)}
+
+.reihen{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 18px}
+.reihe{display:flex;align-items:center;gap:9px}
+.reihe .nr{font-family:var(--display);font-weight:800;font-size:13px;width:32px;text-align:right;font-variant-numeric:tabular-nums}
+.reihe .bahn2{flex:1;height:12px;border:2px solid var(--tinte);border-radius:999px;background:var(--papier);overflow:hidden}
+.reihe .bahn2 i{display:block;height:100%}
+.reihe .pz{font-family:var(--mono);font-size:11px;width:34px;text-align:right;color:#7a6e5e;font-variant-numeric:tabular-nums}
+
+.kalender{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;max-width:290px}
+.kal-kopf{font-family:var(--mono);font-size:10px;text-align:center;color:#7a6e5e}
+.tag{aspect-ratio:1;border-radius:6px;background:var(--w0);border:1.5px solid #00000014;display:grid;place-items:center;font-family:var(--mono);font-size:9px;color:#00000055}
+.tag.geuebt{background:var(--w4);border-color:var(--tinte);color:#fff}
+.tag.viel{background:var(--weide);border-color:var(--tinte);color:#fff}
+.tag.heute{outline:2.5px solid var(--himmel);outline-offset:1px}
+
+.knifflig{display:flex;flex-wrap:wrap;gap:8px}
+.knifflig .k{
+  border:var(--rand);border-radius:12px;background:#fde3e8;padding:7px 11px;
+  font-family:var(--display);font-weight:800;font-size:15px;box-shadow:3px 3px 0 var(--tinte);
+  font-variant-numeric:tabular-nums
+}
+.knifflig .k small{display:block;font-size:10px;font-weight:700;color:#7a6e5e;letter-spacing:.04em}
+
+/* ---------- Schleifen ---------- */
+.schleifen{display:grid;grid-template-columns:repeat(auto-fill,minmax(102px,1fr));gap:10px}
+.sch{text-align:center}
+.sch svg{width:62px;height:auto;display:block;margin:0 auto}
+.sch.zu svg{opacity:.2;filter:grayscale(1)}
+.sch .t{font-family:var(--display);font-weight:800;font-size:12px;margin-top:2px}
+.sch .d{font-size:10.5px;color:#7a6e5e;line-height:1.35}
+
+/* ---------- Album ---------- */
+.album{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
+.foto{
+  position:relative;aspect-ratio:1;border:var(--rand);border-radius:16px;overflow:hidden;
+  background:var(--papier);box-shadow:3px 3px 0 var(--tinte)
+}
+.foto img{width:100%;height:100%;object-fit:cover;display:block}
+.foto.zu{border-style:dashed;box-shadow:none;display:grid;place-items:center}
+.foto.zu span{font-family:var(--display);font-weight:800;font-size:12px;color:#7a6e5e;text-align:center;padding:6px;line-height:1.35}
+.foto .weg{
+  position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:50%;
+  border:2px solid var(--tinte);background:var(--karte);cursor:pointer;font-size:13px;line-height:1;padding:0
+}
+.belohnung{border:var(--rand);border-radius:18px;overflow:hidden;box-shadow:var(--schatten);margin:14px 0}
+.belohnung img{width:100%;display:block;max-height:260px;object-fit:cover}
+.belohnung .bu{font-family:var(--display);font-weight:800;font-size:13.5px;padding:8px 12px;background:var(--heu);border-top:2.5px solid var(--tinte)}
+
+/* ---------- Formular ---------- */
+.feld{margin-bottom:16px}
+.feld > label{display:block;font-family:var(--display);font-weight:800;font-size:14px;margin-bottom:7px}
+.feld .hinweis{font-size:12.5px;color:#7a6e5e;margin-top:6px}
+input[type=text],textarea{
+  width:100%;border:var(--rand);border-radius:14px;background:var(--papier);color:var(--tinte);
+  padding:11px 13px;font-family:var(--body);font-size:16px;box-shadow:inset 3px 3px 0 var(--tinte-15)
+}
+textarea{font-family:var(--mono);font-size:11px;min-height:110px;line-height:1.4}
+.wahl{display:flex;gap:8px;flex-wrap:wrap}
+.wahl button{
+  font-family:var(--display);font-weight:800;font-size:15px;cursor:pointer;
+  border:var(--rand);border-radius:12px;background:var(--karte);color:var(--tinte);
+  padding:9px 15px;box-shadow:3px 3px 0 var(--tinte);touch-action:manipulation
+}
+.wahl button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--tinte)}
+.wahl button.an{background:var(--weide);color:#fff}
+details{border:var(--rand);border-radius:16px;background:var(--papier);padding:12px 14px}
+summary{font-family:var(--display);font-weight:800;cursor:pointer;font-size:15px}
+.fuss{text-align:center;font-size:12px;color:#7a6e5e;margin-top:24px;line-height:1.6}
+
+/* ---------- Hinweisbänder ---------- */
+.band{
+  border:var(--rand);border-radius:16px;padding:12px 14px;margin-bottom:14px;
+  box-shadow:var(--schatten);font-size:14.5px;line-height:1.5
+}
+.band.warnung{background:#fde3e8}
+.band.tipp-band{background:#dff3e3}
+.band b{font-family:var(--display);font-weight:800;display:block;margin-bottom:3px;font-size:15.5px}
+.band .knopf{margin-top:10px}
+.band code{
+  font-family:var(--mono);font-size:12.5px;background:var(--karte);
+  border:2px solid var(--tinte);border-radius:7px;padding:1px 6px;word-break:break-all
+}
+
+[hidden]{display:none !important}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms !important;transition-duration:.001ms !important}}
+@media (max-width:400px){.taste{font-size:23px;padding:12px 0}.app{padding:14px 12px 44px}}
+</style>
+</head>
+<body>
+<canvas id="konfetti"></canvas>
+
+<div class="app" id="app">
+
+  <header class="top">
+    <div class="brand"><span class="brand-mark" id="markePony"></span><span>Zahlenpferd</span></div>
+    <div class="top-chips">
+      <div class="chip flamme" id="chipSerie" title="Tage in Folge">🔥 <b>0</b></div>
+      <div class="chip karotte" id="chipKarotten" title="Karotten">🥕 <b>0</b></div>
+      <div class="chip" id="chipRang">🧹 <b>Stallhilfe</b></div>
+      <button class="chip chip-btn" id="tonKnopf" aria-label="Ton an oder aus">🔊</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab is-on" data-view="reiten">Reiten</button>
+    <button class="tab" data-view="stall">Stall</button>
+    <button class="tab" data-view="koppel">Koppel</button>
+    <button class="tab" data-view="mehr">Mehr</button>
+  </nav>
+
+  <div id="baender"></div>
+
+  <main>
+    <section id="v-reiten">
+      <div class="karte" id="startKarte"></div>
+
+      <div id="spielKarte" hidden>
+        <div class="bahn" id="bahn">
+          <div class="sonne"></div>
+          <div class="bahn-text" id="bahnText">Parcours 1</div>
+          <div id="huerden"></div>
+          <div class="laeufer" id="laeufer" style="left:6%"></div>
+        </div>
+        <div class="hud">
+          <div class="zeitbalken" id="zeitbalken"><i></i></div>
+          <div class="uhr" id="uhr">5:00</div>
+        </div>
+        <div class="zaehler">
+          <div class="chip" id="chipRichtig">✅ <b>0</b></div>
+          <div class="chip" id="chipCombo">⚡ <b>0</b></div>
+          <div class="chip" id="chipXp">🥕 <b>0</b></div>
+        </div>
+
+        <div class="aufgabe" id="aufgabe">
+          <div class="neu-fahne" id="neuFahne" hidden>NEU</div>
+          <div class="term" id="term">7 <span class="mal">×</span> 8</div>
+          <div class="eingabe leer" id="eingabe">&nbsp;<span class="caret"></span></div>
+          <div class="tipp" id="tippBox" hidden></div>
+          <div class="echo" id="echo" hidden></div>
+        </div>
+
+        <div class="tastenfeld" id="tastenfeld">
+          <button class="taste" data-t="1">1</button>
+          <button class="taste" data-t="2">2</button>
+          <button class="taste" data-t="3">3</button>
+          <button class="taste" data-t="4">4</button>
+          <button class="taste" data-t="5">5</button>
+          <button class="taste" data-t="6">6</button>
+          <button class="taste" data-t="7">7</button>
+          <button class="taste" data-t="8">8</button>
+          <button class="taste" data-t="9">9</button>
+          <button class="taste weg" data-t="weg">⌫</button>
+          <button class="taste" data-t="0">0</button>
+          <button class="taste ok" data-t="ok">OK</button>
+        </div>
+
+        <div class="unterzeile">
+          <button class="knopf schmal" id="tippKnopf">💡 Hilfe</button>
+          <button class="knopf schmal" id="schlussKnopf">Absatteln</button>
+        </div>
+      </div>
+
+      <div class="karte" id="endKarte" hidden></div>
+    </section>
+
+    <section id="v-stall" hidden></section>
+    <section id="v-koppel" hidden></section>
+    <section id="v-mehr" hidden></section>
+  </main>
+
+  <p class="fuss">Alles bleibt auf diesem Gerät gespeichert.<br>Unter „Mehr“ kannst du den Fortschritt sichern.</p>
+</div>
+
+<script>
+"use strict";
+
+/* =================================================================
+   1. Zustand
+   ================================================================= */
+const SPEICHER = "zahlenpferd.v1";
+const ALBUM_KEY = "zahlenpferd.album";
+const IVL = [0, 1, 2, 4, 8, 16, 32, 60];   // Tage je Fach
+const MEISTER = 7;                          // oberstes Fach — sattes Grün auf der Koppel
+const SITZT = 4;                            // ab hier gilt eine Aufgabe als sicher
+const SCHNELL = 5000;                       // ms für einen Fachaufstieg
+const BLITZ = 2600;                         // ms für Doppelaufstieg und Extra-Karotten
+const PARCOURS = 15;                        // richtige Antworten je Parcoursrunde
+
+function frisch(){
+  return {
+    v:2, name:"", ponyName:"", pony:"paula", xp:0,
+    fakten:{},                 // "a:b" -> {f:Fach, d:Fälligkeitstag, n, r, w, best}
+    eingefuehrt:0,
+    tage:{},                   // "JJJJ-MM-TT" -> {s:Sekunden, n:Aufgaben, r:richtig}
+    serie:0, serieBest:0, letzterTag:null,
+    gesamtN:0, gesamtR:0, runden:0, parcours:0, homeTippWeg:false,
+    schleifen:[], ponys:["paula"],
+    ein:{ton:true, minuten:5, neuProRunde:6, max:20}
+  };
+}
+/* Ein abgeschotteter Rahmen (etwa die Artefakt-Ansicht) verweigert
+   localStorage. Früher wurde der Fehler verschluckt und der Fortschritt war
+   beim nächsten Laden weg, ohne dass es jemand gemerkt hätte. Jetzt wird der
+   Zustand einmal geprüft und offen gemeldet. */
+const Ablage = (function(){
+  let art = "aus", raum = null;
+  for(const kandidat of ["localStorage","sessionStorage"]){
+    try{
+      const r = window[kandidat];
+      r.setItem("__probe__","1");
+      if(r.getItem("__probe__") === "1"){
+        r.removeItem("__probe__");
+        raum = r; art = kandidat === "localStorage" ? "dauerhaft" : "nur diese Sitzung";
+        break;
+      }
+    }catch(e){ /* nächsten Kandidaten versuchen */ }
+  }
+  return {
+    art,
+    dauerhaft: art === "dauerhaft",
+    lesen(schluessel){ try{ return raum ? raum.getItem(schluessel) : null; }catch(e){ return null; } },
+    schreiben(schluessel, wert){
+      if(!raum) return false;
+      try{ raum.setItem(schluessel, wert); return true; }
+      catch(e){ return false; }      // Kontingent voll
+    }
+  };
+})();
+
+let st = laden();
+let album = albumLaden();
+let speicherWarnungGezeigt = false;
+
+function laden(){
+  try{
+    const roh = Ablage.lesen(SPEICHER);
+    if(!roh) return frisch();
+    const d = JSON.parse(roh);
+    const s = Object.assign(frisch(), d);
+    s.ein = Object.assign(frisch().ein, d.ein||{});
+    if(!Array.isArray(s.ponys) || !s.ponys.length) s.ponys = ["paula"];
+    return s;
+  }catch(e){ return frisch(); }
+}
+function sichern(){ return Ablage.schreiben(SPEICHER, JSON.stringify(st)); }
+function albumLaden(){
+  try{ return JSON.parse(Ablage.lesen(ALBUM_KEY)) || []; }
+  catch(e){ return []; }
+}
+function albumSichern(){ return Ablage.schreiben(ALBUM_KEY, JSON.stringify(album)); }
+
+/* =================================================================
+   2. Datum & Hilfen
+   ================================================================= */
+function tagNr(d){ d = d || new Date(); return Math.floor((d.getTime() - d.getTimezoneOffset()*60000)/86400000); }
+function tagText(d){ d = d || new Date(); const p = n => String(n).padStart(2,"0"); return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()); }
+const HEUTE = () => tagNr();
+const $ = s => document.querySelector(s);
+const el = (t,k,x) => { const n=document.createElement(t); if(k) n.className=k; if(x!=null) n.textContent=x; return n; };
+function mmss(sek){ sek=Math.max(0,Math.round(sek)); return Math.floor(sek/60)+":"+String(sek%60).padStart(2,"0"); }
+function zeitText(sek){
+  if(sek < 60) return Math.round(sek)+" s";
+  const m = Math.round(sek/60);
+  return m < 60 ? m+" min" : Math.floor(m/60)+" h "+(m%60)+" min";
+}
+function uebungsZeit(){ return Object.values(st.tage).reduce((s,t)=>s+(t.s||0),0); }
+function misch(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+const sicher = () => Object.values(st.fakten).filter(f=>f.f>=SITZT).length;
+
+/* =================================================================
+   3. Lehrplan
+   ================================================================= */
+const STUFE = {1:0,2:1,10:1,5:2,11:3,20:3,3:4,4:5,9:6,6:7,8:8,7:9,12:10,15:11,13:13,14:14,16:15,18:16,17:18,19:19};
+function lehrplan(max){
+  const l = [];
+  for(let a=1;a<=max;a++) for(let b=a;b<=max;b++){
+    let r = Math.max(STUFE[a],STUFE[b])*1000 + Math.min(STUFE[a],STUFE[b])*30 + a*b*0.05;
+    if(a===b) r -= 25;
+    l.push({a,b,r});
+  }
+  l.sort((x,y)=>x.r-y.r);
+  return l.map(f=>({a:f.a,b:f.b,k:f.a+":"+f.b}));
+}
+let PLAN = lehrplan(st.ein.max);
+const schluessel = (a,b) => Math.min(a,b)+":"+Math.max(a,b);
+
+/* =================================================================
+   4. Rechenhilfe — Satz plus Bild
+   ================================================================= */
+function tippText(a,b){
+  const gr = Math.max(a,b), kl = Math.min(a,b), p = a*b;
+  if(kl===1)  return "Mal 1 ändert nichts → " + p;
+  if(kl===2)  return "Das Doppelte von "+gr+": "+gr+" + "+gr+" = "+p;
+  if(gr===10 || kl===10) return "Mal 10: eine Null anhängen → " + p;
+  if(kl===5)  return gr+"×10 = "+(gr*10)+", davon die Hälfte → "+p;
+  if(gr===20 || kl===20){ const o = gr===20?kl:gr; return o+"×2 = "+(o*2)+", dann eine Null anhängen → "+p; }
+  if(gr===11 && kl<=9) return "Bei der 11 wird die Ziffer verdoppelt: " + kl + "" + kl;
+  if(gr===9 || kl===9){ const o = gr===9?kl:gr; return o+"×10 − "+o+" = "+(o*10)+" − "+o+" = "+p; }
+  if(a===b)   return "Quadratzahl "+a+"×"+a+" → "+p;
+  if(gr>10)   return kl+"×10 + "+kl+"×"+(gr-10)+" = "+(kl*10)+" + "+(kl*(gr-10))+" = "+p;
+  if(kl===4)  return "Doppelt und nochmal doppelt: "+gr+"×2 = "+(gr*2)+", ×2 = "+p;
+  if(kl===3)  return gr+"×2 + "+gr+" = "+(gr*2)+" + "+gr+" = "+p;
+  if(kl===6)  return gr+"×5 + "+gr+" = "+(gr*5)+" + "+gr+" = "+p;
+  if(kl===8)  return gr+"×10 − "+gr+"×2 = "+(gr*10)+" − "+(gr*2)+" = "+p;
+  if(kl===7)  return gr+"×5 + "+gr+"×2 = "+(gr*5)+" + "+(gr*2)+" = "+p;
+  return kl+"×"+gr+" = "+p;
+}
+
+/* Kleine Aufgaben als abzählbares Feld, große als zerlegtes Rechteck.
+   Das Bild sagt dasselbe wie der Satz — nur räumlich. */
+function bildSVG(a,b){
+  const gr = Math.max(a,b), kl = Math.min(a,b);
+  const T = "#2a2118";
+  if(a*b <= 72){
+    // Fünferblöcke mit Lücke: so lässt sich das Feld bündeln statt einzeln abzählen.
+    const luecke = 5;
+    const z = Math.min(15, Math.floor((228 - Math.floor((gr-1)/5)*luecke)/gr));
+    const w = gr*z + Math.floor((gr-1)/5)*luecke, h = kl*z;
+    let s = '<svg viewBox="0 0 '+(w+4)+' '+(h+4)+'" width="'+Math.min(240,w+4)+'">';
+    for(let y=0;y<kl;y++) for(let x=0;x<gr;x++){
+      const px = x*z + Math.floor(x/5)*luecke + 2;
+      const farbe = Math.floor(x/5)%2 ? "#4a9fd8" : "#e2557a";
+      s += '<rect x="'+px+'" y="'+(y*z+2)+'" width="'+(z-2)+'" height="'+(z-2)+'" rx="'+(z/4)+'" fill="'+farbe+'" stroke="'+T+'" stroke-width="1.4"/>';
+    }
+    return s + '</svg>';
+  }
+  const W = 236, H = 74;
+  if(gr <= 10){
+    return '<svg viewBox="0 0 '+(W+4)+' '+(H+4)+'" width="'+(W+4)+'">'
+      + '<rect x="2" y="2" width="'+W+'" height="'+H+'" rx="6" fill="#a8d18a" stroke="'+T+'" stroke-width="2.5"/>'
+      + '<text x="'+(W/2+2)+'" y="'+(H/2+8)+'" text-anchor="middle" font-family="ui-rounded,system-ui" font-weight="800" font-size="20" fill="'+T+'">'+gr+' × '+kl+' = '+(a*b)+'</text>'
+      + '</svg>';
+  }
+  // Bei 11 oder 12 wäre der rechte Block sonst zu schmal für seine Beschriftung.
+  let w1 = Math.round(W*10/gr);
+  if(W - w1 < 58) w1 = W - 58;
+  const w2 = W - w1;
+  const beschriftung = (x,w,oben,unten) =>
+      '<text x="'+(x+w/2)+'" y="'+(H/2-2)+'" text-anchor="middle" font-family="ui-rounded,system-ui" font-weight="800" font-size="'+(w<58?12:14)+'" fill="'+T+'">'+oben+'</text>'
+    + '<text x="'+(x+w/2)+'" y="'+(H/2+18)+'" text-anchor="middle" font-family="ui-rounded,system-ui" font-weight="800" font-size="'+(w<58?15:18)+'" fill="'+T+'">'+unten+'</text>';
+  return '<svg viewBox="0 0 '+(W+4)+' '+(H+4)+'" width="'+(W+4)+'">'
+    + '<rect x="2" y="2" width="'+w1+'" height="'+H+'" fill="#a8d18a" stroke="'+T+'" stroke-width="2.5"/>'
+    + '<rect x="'+(2+w1)+'" y="2" width="'+w2+'" height="'+H+'" fill="#f0b429" stroke="'+T+'" stroke-width="2.5"/>'
+    + beschriftung(2, w1, '10 × '+kl, String(10*kl))
+    + beschriftung(2+w1, w2, (gr-10)+' × '+kl, String((gr-10)*kl))
+    + '</svg>';
+}
+function zeigeHilfe(a,b){
+  const box = $("#tippBox");
+  box.hidden = false;
+  box.innerHTML = "";
+  box.appendChild(el("div", null, tippText(a,b)));
+  const bild = el("div");
+  bild.innerHTML = bildSVG(a,b);
+  box.appendChild(bild);
+}
+
+/* =================================================================
+   5. Ponys
+   ================================================================= */
+function dunkler(hex,f){
+  const n = parseInt(hex.slice(1),16);
+  const r = Math.round(((n>>16)&255)*f), g = Math.round(((n>>8)&255)*f), b = Math.round((n&255)*f);
+  return "#"+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+function ponySVG(o, breite){
+  const fell = o.fell, maehne = o.maehne, huf = o.huf || "#2f261d";
+  const fern = dunkler(fell,.82), hufFern = dunkler(huf,.85);
+  const bein = (x,y,h,f,hf) =>
+      '<rect x="'+x+'" y="'+y+'" width="13" height="'+h+'" rx="6.5" fill="'+f+'"/>'
+    + '<rect x="'+(x-0.5)+'" y="'+(y+h-9)+'" width="14" height="9" rx="3.5" fill="'+hf+'"/>';
+  return '<svg viewBox="0 0 152 122"'+(breite?' width="'+breite+'"':'')+' xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pony '+(o.name||"")+'">'
+    + '<g stroke="#2a2118" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round">'
+    + '<path d="M32 50 C 12 54 6 80 14 100 C 22 86 28 76 36 70 Z" fill="'+maehne+'"/>'
+    + bein(48,64,42,fern,hufFern) + bein(92,64,42,fern,hufFern)
+    + '<path d="M84 58 L96 20 Q100 14 108 17 L120 22 Q126 25 123 32 L108 66 Z" fill="'+fell+'"/>'
+    + '<path d="M100 14 Q120 6 133 19 Q146 32 137 41 Q129 48 116 43 L101 36 Q94 25 100 14 Z" fill="'+fell+'"/>'
+    + '<path d="M103 15 L104 2 L115 11 Z" fill="'+fell+'"/>'
+    + (o.horn ? '<path d="M116 8 L124 -12 L128 10 Z" fill="#f0b429"/>' : '')
+    + '<ellipse cx="64" cy="60" rx="36" ry="23" fill="'+fell+'"/>'
+    + bein(36,66,40,fell,huf) + bein(80,66,40,fell,huf)
+    + '<path d="M104 10 Q88 24 79 60 Q86 55 93 56 Q96 33 110 18 Z" fill="'+maehne+'"/>'
+    + (o.blesse ? '<path d="M115 11 Q124 24 133 35 Q136 39 132 41 Q127 42 125 38 Q117 26 110 14 Z" fill="#f6efe2"/>' : '')
+    + '<circle cx="121" cy="26" r="2.8" fill="#2a2118" stroke="none"/>'
+    + '<circle cx="136" cy="36" r="1.7" fill="#2a2118" stroke="none"/>'
+    + '</g></svg>';
+}
+
+const PONYS = [
+  {id:"paula",   name:"Paula",   fell:"#c98a52", maehne:"#4b3524", art:"Haflinger",      frei:()=>true,                  wie:"Dein Startpony"},
+  {id:"keks",    name:"Keks",    fell:"#f0e2cb", maehne:"#d9b98c", huf:"#8a7458", art:"Isländer", frei:()=>st.serie>=3,   wie:"3 Tage in Folge reiten"},
+  {id:"schoko",  name:"Schoko",  fell:"#5a4436", maehne:"#2f2119", blesse:1, art:"Friese", frei:()=>st.gesamtN>=100,     wie:"100 Aufgaben rechnen"},
+  {id:"nebel",   name:"Nebel",   fell:"#e6e2db", maehne:"#b9b2a6", huf:"#6f6862", art:"Schimmel", frei:()=>st.serie>=7,  wie:"7 Tage in Folge reiten"},
+  {id:"flamme",  name:"Flamme",  fell:"#d9663f", maehne:"#f4dcae", blesse:1, art:"Fuchs",  frei:()=>sicher()>=25,        wie:"25 Aufgaben sicher können"},
+  {id:"rabe",    name:"Rabe",    fell:"#2f2a2e", maehne:"#f4dcae", art:"Rappe",           frei:()=>st.gesamtN>=500,      wie:"500 Aufgaben rechnen"},
+  {id:"honig",   name:"Honig",   fell:"#e0a03f", maehne:"#6b4423", blesse:1, art:"Palomino", frei:()=>st.serie>=14,     wie:"14 Tage in Folge reiten"},
+  {id:"perle",   name:"Perle",   fell:"#f6efe2", maehne:"#efe4d2", huf:"#9a9184", art:"Cremello", frei:()=>reiheSicherIrgendeine(), wie:"Eine ganze Reihe sicher können"},
+  {id:"minze",   name:"Minze",   fell:"#9db9a4", maehne:"#40554a", blesse:1, art:"Wunderpony", frei:()=>sicher()>=105,  wie:"105 Aufgaben sicher können"},
+  {id:"kirsche", name:"Kirsche", fell:"#b0475e", maehne:"#f6dfe6", blesse:1, art:"Zauberpony", frei:()=>st.serie>=30,   wie:"30 Tage in Folge reiten"},
+  {id:"sturm",   name:"Sturm",   fell:"#6b7f96", maehne:"#2f3b47", art:"Sturmpferd",      frei:()=>st.gesamtN>=2000,     wie:"2000 Aufgaben rechnen"},
+  {id:"stern",   name:"Stern",   fell:"#f3e2f2", maehne:"#d98cc8", blesse:1, horn:1, art:"Einhorn", frei:()=>sicher()>=PLAN.length, wie:"Alle Aufgaben sicher können"}
+];
+const ponyVon = id => PONYS.find(p=>p.id===id) || PONYS[0];
+function reiheSicherIrgendeine(){
+  for(let n=1;n<=st.ein.max;n++) if(reiheSicher(n)) return true;
+  return false;
+}
+function reiheSicher(n){
+  for(let m=1;m<=st.ein.max;m++){
+    const f = st.fakten[schluessel(n,m)];
+    if(!f || f.f < SITZT) return false;
+  }
+  return true;
+}
+function reiheBeruehrt(n){
+  for(let m=1;m<=st.ein.max;m++) if(st.fakten[schluessel(n,m)]) return true;
+  return false;
+}
+function pruefePonys(){
+  const neu = [];
+  PONYS.forEach(p=>{
+    if(st.ponys.indexOf(p.id) < 0 && p.frei()){ st.ponys.push(p.id); neu.push(p); }
+  });
+  return neu;
+}
+
+/* =================================================================
+   6. Ränge
+   ================================================================= */
+const RAENGE = [
+  {xp:0,     e:"🧹", t:"Stallhilfe"},
+  {xp:400,   e:"🪣", t:"Putzprofi"},
+  {xp:1200,  e:"🥕", t:"Karottenmeister"},
+  {xp:2500,  e:"🐴", t:"Führzügel"},
+  {xp:4500,  e:"🎀", t:"Schleifensammler"},
+  {xp:7500,  e:"🏇", t:"Parcoursreiter"},
+  {xp:11500, e:"🏅", t:"Turniersieger"},
+  {xp:17000, e:"🏆", t:"Championat"},
+  {xp:24000, e:"👑", t:"Stallmeister"},
+  {xp:33000, e:"🦄", t:"Einhornflüsterer"}
+];
+const STERN_XP = 9000;
+function rang(xp){
+  let i = 0;
+  for(let j=0;j<RAENGE.length;j++) if(xp >= RAENGE[j].xp) i = j;
+  const r = RAENGE[i];
+  if(i === RAENGE.length-1){
+    const stern = Math.floor((xp - r.xp)/STERN_XP);
+    return {e:r.e, t:r.t + (stern>0 ? " ★"+stern : ""), i, naechste:r.xp + (stern+1)*STERN_XP};
+  }
+  return {e:r.e, t:r.t, i, naechste:RAENGE[i+1].xp};
+}
+
+/* =================================================================
+   7. Turnierschleifen
+   ================================================================= */
+function schleifeSVG(farbe, zeichen){
+  let zacken = "";
+  for(let i=0;i<24;i++){
+    const w = i/24*Math.PI*2, r = i%2 ? 21 : 27;
+    zacken += (i?" L":"M") + (31 + Math.cos(w)*r).toFixed(1) + " " + (31 + Math.sin(w)*r).toFixed(1);
+  }
+  return '<svg viewBox="0 0 62 86" xmlns="http://www.w3.org/2000/svg">'
+    + '<g stroke="#2a2118" stroke-width="2.6" stroke-linejoin="round">'
+    + '<path d="M22 48 L15 84 L31 75 L47 84 L40 48 Z" fill="'+farbe+'"/>'
+    + '<path d="'+zacken+' Z" fill="'+farbe+'"/>'
+    + '<circle cx="31" cy="31" r="15" fill="#fffdf7"/>'
+    + '</g>'
+    + '<text x="31" y="38" text-anchor="middle" font-size="16">'+zeichen+'</text>'
+    + '</svg>';
+}
+const SCHLEIFEN = [
+  {id:"start",  f:"#3d9a5f", e:"🌱", t:"Erster Ritt",   d:"Eine Runde geschafft"},
+  {id:"d3",     f:"#f0b429", e:"🔥", t:"Drei am Stück", d:"3 Tage in Folge"},
+  {id:"d7",     f:"#e2557a", e:"🗓️", t:"Ganze Woche",   d:"7 Tage in Folge"},
+  {id:"d30",    f:"#8e44ad", e:"👑", t:"Monatsheld",    d:"30 Tage in Folge"},
+  {id:"a100",   f:"#4a9fd8", e:"💯", t:"Hundert",       d:"100 Aufgaben gerechnet"},
+  {id:"a500",   f:"#a5542a", e:"📚", t:"Fünfhundert",   d:"500 Aufgaben gerechnet"},
+  {id:"a2000",  f:"#2a2118", e:"🏛️", t:"Zweitausend",   d:"2000 Aufgaben gerechnet"},
+  {id:"c10",    f:"#f0b429", e:"⚡", t:"Blitzserie",    d:"10 richtige in Folge"},
+  {id:"c25",    f:"#e2557a", e:"🌟", t:"Superserie",    d:"25 richtige in Folge"},
+  {id:"rein",   f:"#3d9a5f", e:"🎯", t:"Fehlerfrei",    d:"Runde mit 20+ Aufgaben ohne Fehler"},
+  {id:"p1",     f:"#4a9fd8", e:"🚧", t:"Erster Parcours",d:"Einen Parcours zu Ende geritten"},
+  {id:"p25",    f:"#a5542a", e:"🏇", t:"25 Parcours",   d:"25 Parcours geschafft"},
+  {id:"s25",    f:"#3d9a5f", e:"🌿", t:"25 sitzen",     d:"25 Aufgaben sicher"},
+  {id:"s105",   f:"#2f8a52", e:"🏔️", t:"Halbe Koppel",  d:"105 Aufgaben sicher"},
+  {id:"s210",   f:"#8e44ad", e:"🦄", t:"Ganze Koppel",  d:"Alle Aufgaben sicher"},
+  {id:"r7",     f:"#e2557a", e:"🍀", t:"Siebenerreihe", d:"7er-Reihe komplett sicher"},
+  {id:"r13",    f:"#8e44ad", e:"🔮", t:"Dreizehnerreihe",d:"13er-Reihe komplett sicher"},
+  {id:"alle20", f:"#f0b429", e:"🛰️", t:"Bis zwanzig",   d:"Jede Reihe einmal geübt"}
+];
+function pruefeSchleifen(runde){
+  const neu = [];
+  const hat = id => st.schleifen.indexOf(id) >= 0;
+  const gib = id => { if(!hat(id)){ st.schleifen.push(id); neu.push(SCHLEIFEN.find(s=>s.id===id)); } };
+  const s = sicher();
+  gib("start");
+  if(st.serie >= 3)  gib("d3");
+  if(st.serie >= 7)  gib("d7");
+  if(st.serie >= 30) gib("d30");
+  if(st.gesamtN >= 100)  gib("a100");
+  if(st.gesamtN >= 500)  gib("a500");
+  if(st.gesamtN >= 2000) gib("a2000");
+  if(runde.comboBest >= 10) gib("c10");
+  if(runde.comboBest >= 25) gib("c25");
+  if(runde.n >= 20 && runde.r === runde.n) gib("rein");
+  if(st.parcours >= 1)  gib("p1");
+  if(st.parcours >= 25) gib("p25");
+  if(s >= 25)  gib("s25");
+  if(s >= 105) gib("s105");
+  if(s >= PLAN.length) gib("s210");
+  if(reiheSicher(7))  gib("r7");
+  if(reiheSicher(13)) gib("r13");
+  let alle = true;
+  for(let n=1;n<=20;n++) if(!reiheBeruehrt(n)) alle = false;
+  if(alle) gib("alle20");
+  return neu;
+}
+
+/* =================================================================
+   8. Töne
+   ================================================================= */
+let AC = null;
+function ac(){
+  if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
+  if(AC.state === "suspended") AC.resume();
+  return AC;
+}
+function ton(freq, dauer, art, laut){
+  if(!st.ein.ton) return;
+  const c = ac(); if(!c) return;
+  try{
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = art || "triangle"; o.frequency.value = freq;
+    g.gain.setValueAtTime(laut || 0.07, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dauer);
+    o.connect(g); g.connect(c.destination);
+    o.start(); o.stop(c.currentTime + dauer);
+  }catch(e){}
+}
+function huftritt(){
+  if(!st.ein.ton) return;
+  const c = ac(); if(!c) return;
+  try{
+    [0, 130].forEach(v=>{
+      const laenge = Math.floor(c.sampleRate * 0.05);
+      const puffer = c.createBuffer(1, laenge, c.sampleRate);
+      const daten = puffer.getChannelData(0);
+      for(let i=0;i<laenge;i++) daten[i] = (Math.random()*2-1) * Math.pow(1 - i/laenge, 3);
+      const q = c.createBufferSource(); q.buffer = puffer;
+      const filter = c.createBiquadFilter(); filter.type = "lowpass"; filter.frequency.value = 420;
+      const g = c.createGain(); g.gain.value = 0.28;
+      q.connect(filter); filter.connect(g); g.connect(c.destination);
+      q.start(c.currentTime + v/1000);
+    });
+  }catch(e){}
+}
+const tRichtig = () => { ton(784,.09); setTimeout(()=>ton(1175,.13),75); };
+const tFalsch  = () => ton(180,.22,"sawtooth",.05);
+const tTaste   = () => ton(520,.03,"square",.025);
+const tFanfare = () => [523,659,784,1047].forEach((f,i)=>setTimeout(()=>ton(f,.2),i*115));
+
+/* =================================================================
+   9. Konfetti
+   ================================================================= */
+const cv = $("#konfetti"), ctx = cv.getContext("2d");
+let teile = [], animLaeuft = false;
+const FARBEN = ["#e2557a","#4a9fd8","#f0b429","#3d9a5f","#a5542a"];
+function groesse(){ cv.width = innerWidth*devicePixelRatio; cv.height = innerHeight*devicePixelRatio; ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+addEventListener("resize", groesse); groesse();
+function konfetti(menge){
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  for(let i=0;i<menge;i++){
+    teile.push({x:Math.random()*innerWidth, y:-20 - Math.random()*innerHeight*0.3,
+      vx:(Math.random()-0.5)*3, vy:2+Math.random()*3.5,
+      b:6+Math.random()*7, h:4+Math.random()*7,
+      w:Math.random()*Math.PI, vw:(Math.random()-0.5)*0.3,
+      f:FARBEN[Math.floor(Math.random()*FARBEN.length)]});
+  }
+  if(!animLaeuft){ animLaeuft = true; requestAnimationFrame(schleife); }
+}
+function schleife(){
+  ctx.clearRect(0,0,innerWidth,innerHeight);
+  teile = teile.filter(p => p.y < innerHeight + 40);
+  for(const p of teile){
+    p.x += p.vx; p.y += p.vy; p.vy += 0.045; p.w += p.vw;
+    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.w);
+    ctx.fillStyle = p.f; ctx.fillRect(-p.b/2,-p.h/2,p.b,p.h);
+    ctx.strokeStyle = "#2a2118"; ctx.lineWidth = 1; ctx.strokeRect(-p.b/2,-p.h/2,p.b,p.h);
+    ctx.restore();
+  }
+  if(teile.length) requestAnimationFrame(schleife);
+  else { animLaeuft = false; ctx.clearRect(0,0,innerWidth,innerHeight); }
+}
+
+/* =================================================================
+   10. Runde
+   ================================================================= */
+let R = null, karte = null, eingabe = "";
+let kartenStart = 0, tippGenutzt = false, gesperrt = false;
+let uhrId = null, weiterTimer = null, feedbackSeit = 0;
+
+function faelligeKeys(){
+  const t = HEUTE();
+  return Object.keys(st.fakten)
+    .filter(k => st.fakten[k].d <= t)
+    .sort((x,y) => (st.fakten[x].d - st.fakten[y].d) || (st.fakten[x].f - st.fakten[y].f));
+}
+function neuesFakt(){
+  while(st.eingefuehrt < PLAN.length){
+    const p = PLAN[st.eingefuehrt];
+    if(!st.fakten[p.k]) return p;
+    st.eingefuehrt++;
+  }
+  return null;
+}
+function fuelleWarteschlange(erst){
+  const faellig = faelligeKeys().filter(k => !R.queue.some(q => q.k === k));
+  for(const k of faellig.slice(0, erst ? 22 : 12)){
+    const [a,b] = k.split(":").map(Number);
+    R.queue.push({k, a, b, neu:false});
+  }
+  const neueDazu = anzahl => {
+    for(let i=0;i<anzahl;i++){
+      const p = neuesFakt();
+      if(!p) return;
+      st.fakten[p.k] = {f:0, d:HEUTE(), n:0, r:0, w:0, best:0};
+      st.eingefuehrt++; R.neuHeute++;
+      R.queue.push({k:p.k, a:p.a, b:p.b, neu:true});
+    }
+  };
+  if(R.queue.length < 16) neueDazu(Math.max(0, st.ein.neuProRunde - R.neuHeute));
+  // Nichts fällig und das Kontingent aufgebraucht? Dann darf es wachsen —
+  // es ist ja noch Zeit auf der Uhr.
+  if(!R.queue.length) neueDazu(4);
+  if(!R.queue.length){
+    const alle = Object.keys(st.fakten);
+    if(!alle.length) return;
+    alle.sort((x,y) => (st.fakten[x].f - st.fakten[y].f) || (st.fakten[y].w - st.fakten[x].w));
+    misch(alle.slice(0,12)).slice(0,8).forEach(k=>{
+      const [a,b] = k.split(":").map(Number);
+      if(!R.queue.some(q=>q.k===k)) R.queue.push({k,a,b,neu:false});
+    });
+  }
+}
+
+function starteRunde(){
+  ac();
+  R = {queue:[], n:0, r:0, combo:0, comboBest:0, xp:0, neuHeute:0, runden:0, imParcours:0,
+       endeUm: Date.now() + st.ein.minuten*60000, start: Date.now(), letzterK:null};
+  clearTimeout(weiterTimer); weiterTimer = null;
+  fuelleWarteschlange(true);
+  $("#startKarte").hidden = true;
+  $("#endKarte").hidden = true;
+  $("#spielKarte").hidden = false;
+  baueBahn();
+  aktualisiereHud();
+  uhrId = setInterval(tick, 250);
+  naechsteKarte();
+}
+
+function baueBahn(){
+  const h = $("#huerden");
+  h.innerHTML = "";
+  for(let i=1;i<=4;i++){
+    const d = el("div","huerde");
+    d.style.left = (6 + i*88/5) + "%";
+    d.dataset.i = i;
+    d.innerHTML = "<b></b><b></b><i></i><i></i><i></i>";
+    h.appendChild(d);
+  }
+  $("#laeufer").innerHTML = ponySVG(ponyVon(st.pony));
+  $("#laeufer").style.left = "6%";
+  $("#bahnText").textContent = "Parcours " + (R.runden + 1);
+}
+function bewegeLaeufer(){
+  const anteil = R.imParcours / PARCOURS;
+  const l = $("#laeufer");
+  l.style.left = (6 + anteil*88) + "%";
+  l.classList.remove("springt");
+  void l.offsetWidth;
+  l.classList.add("springt");
+  huftritt();
+  document.querySelectorAll(".huerde").forEach(h=>{
+    h.classList.toggle("weg", anteil*5 >= Number(h.dataset.i));
+  });
+}
+
+function tick(){
+  const rest = (R.endeUm - Date.now())/1000;
+  $("#uhr").textContent = mmss(rest);
+  const bar = $("#zeitbalken");
+  bar.firstElementChild.style.width = Math.max(0, Math.min(100, rest/(st.ein.minuten*60)*100)) + "%";
+  bar.classList.toggle("knapp", rest <= 30);
+  if(rest <= 0) beendeRunde();
+}
+
+function naechsteKarte(){
+  if(!R) return;
+  if(Date.now() >= R.endeUm){ beendeRunde(); return; }
+  if(!R.queue.length) fuelleWarteschlange(false);
+  if(!R.queue.length){ beendeRunde(); return; }
+  let i = 0;
+  if(R.queue.length > 1 && R.queue[0].k === R.letzterK) i = 1;
+  karte = R.queue.splice(i,1)[0];
+  stelleAufgabe(karte);
+}
+
+function stelleAufgabe(k){
+  const dreh = Math.random() < 0.5;
+  $("#term").innerHTML = (dreh?k.b:k.a) + ' <span class="mal">×</span> ' + (dreh?k.a:k.b);
+  $("#neuFahne").hidden = !k.neu;
+  $("#aufgabe").className = "aufgabe" + (k.neu ? " neu" : "");
+  $("#tippBox").hidden = true;
+  $("#echo").hidden = true;
+  eingabe = ""; tippGenutzt = false; gesperrt = false;
+  zeichneEingabe();
+  kartenStart = Date.now();
+}
+function zeichneEingabe(){
+  const e = $("#eingabe");
+  if(!eingabe){ e.className = "eingabe leer"; e.innerHTML = '&nbsp;<span class="caret"></span>'; }
+  else { e.className = "eingabe"; e.innerHTML = eingabe + '<span class="caret"></span>'; }
+}
+function tippe(z){
+  if(gesperrt || eingabe.length >= 3) return;
+  if(eingabe === "0") eingabe = "";
+  eingabe += z; tTaste(); zeichneEingabe();
+}
+function loesche(){ if(gesperrt) return; eingabe = eingabe.slice(0,-1); tTaste(); zeichneEingabe(); }
+
+function pruefe(){
+  if(gesperrt){                                   // nach der Rückmeldung ist OK das Weiter
+    if(R && Date.now() - feedbackSeit > 600){ clearTimeout(weiterTimer); naechsteKarte(); }
+    return;
+  }
+  if(!eingabe.length || !karte) return;
+  gesperrt = true;
+  const erste = st.fakten[karte.k] && st.fakten[karte.k].n === 0;
+  const ms = Date.now() - kartenStart;
+  const soll = karte.a * karte.b;
+  const ok = Number(eingabe) === soll;
+
+  bewerte(karte.k, ok, ms, tippGenutzt);
+  R.n++; st.gesamtN++;
+  let parcoursVoll = false;
+
+  if(ok){
+    R.r++; st.gesamtR++;
+    R.combo++; R.comboBest = Math.max(R.comboBest, R.combo);
+    let karotten = 10;
+    if(ms < BLITZ) karotten += 6; else if(ms < SCHNELL) karotten += 3;
+    if(tippGenutzt) karotten = Math.max(4, karotten - 5);
+    karotten += Math.min(10, Math.floor(R.combo/3)*2);
+    R.xp += karotten; st.xp += karotten;
+
+    R.imParcours++;
+    if(R.imParcours >= PARCOURS){ parcoursVoll = true; R.imParcours = PARCOURS; }
+    bewegeLaeufer();
+
+    $("#aufgabe").classList.add("richtig");
+    const e = $("#echo"); e.hidden = false;
+    e.textContent = erste && ms < SCHNELL ? "🌟 Die kannst du schon!  +" + karotten + " 🥕"
+                  : ms < BLITZ            ? "⚡ Wie der Blitz!  +" + karotten + " 🥕"
+                  : R.combo >= 5          ? "🔥 " + R.combo + "er-Serie!  +" + karotten + " 🥕"
+                                          : "✅ Richtig!  +" + karotten + " 🥕";
+    tRichtig();
+    if(R.combo > 0 && R.combo % 10 === 0) konfetti(50);
+  }else{
+    R.combo = 0;
+    $("#aufgabe").classList.add("falsch");
+    const e = $("#echo"); e.hidden = false;
+    e.innerHTML = (erste ? "Neue Aufgabe — " : "") + karte.a + " × " + karte.b + " = <b>" + soll + "</b>"
+      + '<div style="font-size:13px;font-weight:700;color:#7a6e5e;margin-top:6px">OK drücken für weiter</div>';
+    zeigeHilfe(karte.a, karte.b);
+    tFalsch();
+    R.queue.splice(Math.min(3, R.queue.length), 0, {k:karte.k, a:karte.a, b:karte.b, neu:false});
+  }
+
+  if(parcoursVoll){
+    R.runden++; st.parcours++;
+    konfetti(120); tFanfare();
+    $("#bahnText").textContent = "Parcours " + R.runden + " geschafft! 🏆";
+    setTimeout(()=>{ if(R){ R.imParcours = 0; baueBahn(); } }, 1400);
+  }
+
+  R.letzterK = karte.k;
+  feedbackSeit = Date.now();
+  aktualisiereHud();
+  sichern();
+  clearTimeout(weiterTimer);
+  weiterTimer = setTimeout(naechsteKarte, ok ? (parcoursVoll ? 1700 : 650) : 4000);
+}
+
+function bewerte(k, ok, ms, mitTipp){
+  const f = st.fakten[k];
+  if(!f) return;
+  const t = HEUTE();
+  const erste = f.n === 0;
+  f.n++;
+  if(ok){
+    f.r++;
+    // Beim allerersten Mal sofort richtig? Dann sitzt die Aufgabe längst und
+    // muss die Runde nicht blockieren. Blitzschnell heißt zwei Fächer weiter.
+    if(erste && ms < SCHNELL && !mitTipp) f.f = SITZT;
+    else if(ms < BLITZ && !mitTipp)       f.f = Math.min(MEISTER, f.f + 2);
+    else if(ms < SCHNELL && !mitTipp)     f.f = Math.min(MEISTER, f.f + 1);
+    else                                  f.f = Math.max(1, f.f);
+    f.d = t + IVL[f.f];
+    if(!f.best || ms < f.best) f.best = ms;
+  }else{
+    f.w++;
+    f.f = Math.max(0, f.f - 2);
+    f.d = t;
+  }
+}
+
+function aktualisiereHud(){
+  $("#chipRichtig").innerHTML = "✅ <b>" + R.r + "/" + R.n + "</b>";
+  $("#chipCombo").innerHTML   = "⚡ <b>" + R.combo + "</b>";
+  $("#chipXp").innerHTML      = "🥕 <b>" + R.xp + "</b>";
+}
+
+function beendeRunde(){
+  if(!R) return;
+  clearInterval(uhrId); uhrId = null;
+  clearTimeout(weiterTimer); weiterTimer = null;
+  const dauer = Math.min(Date.now() - R.start, st.ein.minuten*60000 + 60000);
+  const runde = {n:R.n, r:R.r, xp:R.xp, comboBest:R.comboBest, neu:R.neuHeute,
+                 parcours:R.runden, sek:Math.round(dauer/1000)};
+  const rangVorher = rang(st.xp - R.xp);
+
+  const dt = tagText();
+  const tag = st.tage[dt] || {s:0,n:0,r:0};
+  tag.s += runde.sek; tag.n += runde.n; tag.r += runde.r;
+  st.tage[dt] = tag;
+
+  const heute = HEUTE();
+  if(st.letzterTag !== heute){
+    st.serie = (st.letzterTag === heute - 1) ? st.serie + 1 : 1;
+    st.letzterTag = heute;
+    st.serieBest = Math.max(st.serieBest, st.serie);
+  }
+  if(runde.n > 0) st.runden++;
+
+  const neuePonys = pruefePonys();
+  const neueSchleifen = pruefeSchleifen(runde);
+  const rangJetzt = rang(st.xp);
+  const aufgestiegen = rangJetzt.t !== rangVorher.t;
+  sichern();
+
+  R = null; karte = null; gesperrt = true;
+  $("#spielKarte").hidden = true;
+  zeigeEnde(runde, neueSchleifen, neuePonys, aufgestiegen, rangJetzt);
+  kopfAktualisieren();
+  zeigeBaender();
+}
+
+function zeigeEnde(runde, neueSchleifen, neuePonys, aufgestiegen, rangJetzt){
+  const k = $("#endKarte");
+  k.hidden = false; k.innerHTML = "";
+  const quote = runde.n ? Math.round(runde.r/runde.n*100) : 0;
+  const pName = st.ponyName.trim() || ponyVon(st.pony).name;
+
+  let titel = "Abgesattelt!";
+  if(runde.n === 0) titel = "Noch nichts geritten 🤔";
+  else if(quote === 100) titel = "Fehlerfrei durch den Parcours! 🎯";
+  else if(quote >= 85)  titel = "Starker Ritt! 🏇";
+  else if(quote >= 65)  titel = "Gut gemacht! 👏";
+  else titel = "Weiter so — Üben wirkt! 🌱";
+
+  const buehne = el("div","pony-buehne");
+  const bild = el("div","bild"); bild.innerHTML = ponySVG(ponyVon(st.pony));
+  const txt = el("div");
+  txt.appendChild(el("h2","jubel", titel));
+  txt.appendChild(el("p","pony-sub", st.serie > 1
+    ? pName + " freut sich: Tag " + st.serie + " in Folge. 🔥"
+    : "Tag 1 deiner Serie. Reitest du morgen wieder, wächst die Flamme. 🔥"));
+  buehne.appendChild(bild); buehne.appendChild(txt);
+  k.appendChild(buehne);
+
+  const w = el("div","werte");
+  const wert = (z,l,klasse) => { const d = el("div","wert "+(klasse||"")); d.appendChild(el("div","z",String(z))); d.appendChild(el("div","l",l)); return d; };
+  w.appendChild(wert(runde.n, "Aufgaben"));
+  w.appendChild(wert(quote + "%", "richtig", quote>=85?"gut":""));
+  w.appendChild(wert(runde.parcours, "Parcours", runde.parcours?"gold":""));
+  w.appendChild(wert("+" + runde.xp, "Karotten", "gold"));
+  k.appendChild(w);
+
+  const foto = belohnungsFoto();
+  if(foto){
+    const b = el("div","belohnung");
+    const i = document.createElement("img"); i.src = foto; i.alt = "Pferdefoto aus deinem Album";
+    b.appendChild(i);
+    b.appendChild(el("div","bu","🐴 Dein Foto zur Belohnung"));
+    k.appendChild(b);
+  }
+
+  if(neuePonys.length){
+    k.appendChild(el("div","abschnitt-titel", neuePonys.length===1 ? "Neues Pony im Stall" : "Neue Ponys im Stall"));
+    const g = el("div","stall");
+    neuePonys.forEach(p=>{
+      const d = el("div","box");
+      d.innerHTML = ponySVG(p);
+      d.appendChild(el("div","n", p.name));
+      d.appendChild(el("div","b", p.art));
+      g.appendChild(d);
+    });
+    g.style.marginBottom = "14px";
+    k.appendChild(g);
+    konfetti(140);
+  }
+  if(aufgestiegen){
+    const p = el("p","tipp", "🎉 Neuer Rang: " + rangJetzt.e + " " + rangJetzt.t + "!");
+    p.style.margin = "0 0 12px"; k.appendChild(p);
+  }
+  if(neueSchleifen.length){
+    k.appendChild(el("div","abschnitt-titel","Neue Turnierschleifen"));
+    const g = el("div","schleifen");
+    neueSchleifen.forEach(s=>{
+      const d = el("div","sch");
+      d.innerHTML = schleifeSVG(s.f, s.e);
+      d.appendChild(el("div","t", s.t));
+      d.appendChild(el("div","d", s.d));
+      g.appendChild(d);
+    });
+    g.style.marginBottom = "14px";
+    k.appendChild(g);
+  }
+
+  const reihe = el("div","knopf-reihe");
+  const b1 = el("button","knopf schleife","Nochmal aufsitzen");
+  b1.onclick = () => { $("#endKarte").hidden = true; starteRunde(); };
+  const b2 = el("button","knopf","Koppel ansehen");
+  b2.onclick = () => zeigeAnsicht("koppel");
+  reihe.appendChild(b1); reihe.appendChild(b2);
+  k.appendChild(reihe);
+
+  if(runde.n >= 5 && !neuePonys.length){ konfetti(quote === 100 ? 160 : 90); tFanfare(); }
+}
+
+/* Alle zwei Runden wird ein weiteres eigenes Foto freigeschaltet. */
+function freieFotos(){ return album.length ? Math.min(album.length, 1 + Math.floor(st.runden/2)) : 0; }
+function belohnungsFoto(){
+  const n = freieFotos();
+  return n ? album[(st.runden - 1 + album.length) % n] : null;
+}
+
+/* =================================================================
+   11. Kopf & Startkarte
+   ================================================================= */
+function kopfAktualisieren(){
+  const r = rang(st.xp);
+  $("#chipSerie").innerHTML = "🔥 <b>" + st.serie + "</b>";
+  $("#chipKarotten").innerHTML = "🥕 <b>" + st.xp + "</b>";
+  $("#chipRang").innerHTML = r.e + " <b>" + r.t + "</b>";
+  $("#tonKnopf").textContent = st.ein.ton ? "🔊" : "🔇";
+  $("#markePony").innerHTML = ponySVG(ponyVon(st.pony));
+}
+
+function zeichneStart(){
+  const k = $("#startKarte");
+  k.innerHTML = "";
+  const faellig = faelligeKeys().length;
+  const heuteSchon = st.tage[tagText()];
+  const name = st.name.trim();
+  const pony = ponyVon(st.pony);
+  const pName = st.ponyName.trim() || pony.name;
+
+  const buehne = el("div","pony-buehne");
+  const bild = el("div","bild"); bild.innerHTML = ponySVG(pony);
+  const txt = el("div");
+  txt.appendChild(el("h2", null, name
+    ? (heuteSchon ? "Nochmal, " + name + "?" : "Hallo " + name + "!")
+    : (heuteSchon ? "Nochmal aufsitzen?" : "Bereit für heute?")));
+  txt.appendChild(el("p","pony-sub", pName + " wartet schon gesattelt."));
+  buehne.appendChild(bild); buehne.appendChild(txt);
+  k.appendChild(buehne);
+
+  k.appendChild(el("p","lead", heuteSchon
+    ? "Heute schon " + heuteSchon.n + " Aufgaben gerechnet. Noch eine Runde?"
+    : (st.gesamtN === 0
+        ? "Jeden Tag " + st.ein.minuten + " Minuten. Das Zahlenpferd sucht genau die Aufgaben heraus, die heute dran sind — erst leichte, dann immer mehr."
+        : "Heute stehen " + (faellig || "ein paar") + " Aufgaben zur Wiederholung an. " + st.ein.minuten + " Minuten reichen.")));
+
+  const w = el("div","werte");
+  const wert = (z,l,klasse) => { const d = el("div","wert "+(klasse||"")); d.appendChild(el("div","z",String(z))); d.appendChild(el("div","l",l)); return d; };
+  w.appendChild(wert(st.serie, "Tage in Folge", st.serie>0?"gold":""));
+  w.appendChild(wert(sicher() + "/" + PLAN.length, "sitzt sicher", sicher()>0?"gut":""));
+  k.appendChild(w);
+
+  const b = el("button","knopf gross schleife", heuteSchon ? "Nochmal aufsitzen" : "Aufsitzen und los");
+  b.id = "startKnopf";
+  b.onclick = starteRunde;
+  k.appendChild(b);
+
+  const r = rang(st.xp);
+  const f = el("p","lead", "Noch " + (r.naechste - st.xp) + " Karotten bis zum nächsten Rang.");
+  f.style.cssText = "margin:12px 0 0;font-size:13px";
+  k.appendChild(f);
+}
+
+/* =================================================================
+   12. Stall
+   ================================================================= */
+function zeichneStall(){
+  const v = $("#v-stall");
+  v.innerHTML = "";
+  const pony = ponyVon(st.pony);
+
+  const k = el("div","karte");
+  k.appendChild(el("h2",null,"Mein Pony"));
+  const buehne = el("div","pony-buehne");
+  const bild = el("div","bild"); bild.style.width = "140px"; bild.innerHTML = ponySVG(pony);
+  const txt = el("div");
+  txt.appendChild(el("p","pony-name", st.ponyName.trim() || pony.name));
+  txt.appendChild(el("p","pony-sub", pony.art + " · " + st.ponys.length + " von " + PONYS.length + " Ponys im Stall"));
+  buehne.appendChild(bild); buehne.appendChild(txt);
+  k.appendChild(buehne);
+
+  const f = el("div","feld"); f.style.marginTop = "12px";
+  f.appendChild(el("label",null,"Wie soll dein Pony heißen?"));
+  const inp = document.createElement("input");
+  inp.type = "text"; inp.value = st.ponyName; inp.placeholder = pony.name; inp.maxLength = 18;
+  inp.oninput = () => { st.ponyName = inp.value; sichern(); };
+  f.appendChild(inp);
+  k.appendChild(f);
+  v.appendChild(k);
+
+  const s = el("div","karte");
+  s.appendChild(el("h2",null,"Der Stall"));
+  s.appendChild(el("p","lead","Tippe ein Pony an, um damit zu reiten. Verschlossene Boxen verraten, was zu tun ist."));
+  const g = el("div","stall");
+  PONYS.forEach(p=>{
+    const hat = st.ponys.indexOf(p.id) >= 0;
+    const d = el("div","box" + (hat ? "" : " zu") + (st.pony===p.id ? " aktiv" : ""));
+    d.innerHTML = ponySVG(p);
+    d.appendChild(el("div","n", hat ? p.name : "???"));
+    d.appendChild(el("div","b", hat ? p.art : p.wie));
+    if(hat && st.pony===p.id) d.appendChild(el("div","marke","reitet gerade"));
+    if(hat){
+      d.onclick = () => { st.pony = p.id; sichern(); kopfAktualisieren(); zeichneStall(); zeichneStart(); ton(660,.1); setTimeout(()=>ton(880,.12),90); };
+    }
+    g.appendChild(d);
+  });
+  s.appendChild(g);
+  v.appendChild(s);
+
+  const sc = el("div","karte");
+  sc.appendChild(el("h2",null,"Turnierschleifen"));
+  sc.appendChild(el("p","lead", st.schleifen.length + " von " + SCHLEIFEN.length + " gewonnen."));
+  const sg = el("div","schleifen");
+  SCHLEIFEN.forEach(x=>{
+    const hat = st.schleifen.indexOf(x.id) >= 0;
+    const d = el("div","sch" + (hat ? "" : " zu"));
+    d.innerHTML = schleifeSVG(hat ? x.f : "#c9c2b4", hat ? x.e : "🔒");
+    d.appendChild(el("div","t", x.t));
+    d.appendChild(el("div","d", x.d));
+    sg.appendChild(d);
+  });
+  sc.appendChild(sg);
+  v.appendChild(sc);
+
+  v.appendChild(albumKarte());
+}
+
+/* =================================================================
+   13. Fotoalbum — eigene Bilder, bleiben auf dem Gerät
+   ================================================================= */
+function albumKarte(){
+  const k = el("div","karte");
+  k.appendChild(el("h2",null,"Fotoalbum"));
+  k.appendChild(el("p","lead", album.length
+    ? "Nach je zwei Runden wird ein weiteres Foto freigeschaltet — " + freieFotos() + " von " + album.length + " sind offen."
+    : "Hier kommen eure eigenen Pferdefotos hinein. Nach je zwei geübten Runden wird eins davon freigeschaltet."));
+
+  if(album.length){
+    const g = el("div","album");
+    album.forEach((src,i)=>{
+      const offen = i < freieFotos();
+      const d = el("div","foto" + (offen ? "" : " zu"));
+      if(offen){
+        const img = document.createElement("img"); img.src = src; img.alt = "Pferdefoto " + (i+1);
+        d.appendChild(img);
+        const w = el("button","weg","✕");
+        w.title = "Foto entfernen";
+        w.onclick = () => {
+          if(confirm("Dieses Foto aus dem Album entfernen?")){
+            album.splice(i,1); albumSichern(); zeichneStall();
+          }
+        };
+        d.appendChild(w);
+      }else{
+        d.appendChild(el("span", null, "🔒 noch " + ((i - freieFotos() + 1)*2) + " Runden"));
+      }
+      g.appendChild(d);
+    });
+    k.appendChild(g);
+  }
+
+  const zeile = el("div","knopf-reihe"); zeile.style.marginTop = "12px";
+  const wahl = document.createElement("input");
+  wahl.type = "file"; wahl.accept = "image/*"; wahl.multiple = true; wahl.hidden = true;
+  const b = el("button","knopf schmal","📷 Fotos hinzufügen");
+  b.onclick = () => wahl.click();
+  const stand = el("div","hinweis","");
+  stand.style.cssText = "font-size:12.5px;color:#7a6e5e;margin-top:10px";
+  wahl.onchange = async () => {
+    const dateien = [].slice.call(wahl.files).slice(0, 24 - album.length);
+    if(!dateien.length){ stand.textContent = "Das Album ist voll (24 Fotos)."; return; }
+    stand.textContent = "Wird verkleinert …";
+    for(const datei of dateien){
+      try{ album.push(await verkleinern(datei)); }
+      catch(e){ stand.textContent = "„" + datei.name + "“ konnte nicht gelesen werden."; }
+    }
+    if(!albumSichern()){
+      album = albumLaden();
+      stand.textContent = "Kein Platz mehr im Speicher — bitte erst ein paar Fotos entfernen.";
+      return;
+    }
+    zeichneStall();
+  };
+  zeile.appendChild(b);
+  k.appendChild(zeile);
+  k.appendChild(wahl);
+  k.appendChild(stand);
+  const datenschutz = el("div", null, "Die Fotos bleiben in diesem Browser und werden nirgendwohin geschickt.");
+  datenschutz.style.cssText = "font-size:12.5px;color:#7a6e5e;margin-top:8px";
+  k.appendChild(datenschutz);
+  return k;
+}
+function verkleinern(datei){
+  return new Promise((fertig, fehler)=>{
+    const leser = new FileReader();
+    leser.onerror = fehler;
+    leser.onload = () => {
+      const img = new Image();
+      img.onerror = fehler;
+      img.onload = () => {
+        const max = 640;
+        const s = Math.min(1, max/Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.width*s); c.height = Math.round(img.height*s);
+        c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+        fertig(c.toDataURL("image/jpeg", 0.7));
+      };
+      img.src = leser.result;
+    };
+    leser.readAsDataURL(datei);
+  });
+}
+
+/* =================================================================
+   14. Koppel
+   ================================================================= */
+function stufeVon(f){
+  if(!f) return 0;
+  if(f.f <= 1) return 1;
+  if(f.f <= 3) return 2;
+  if(f.f <= 5) return 3;
+  if(f.f <= 6) return 4;
+  return 5;
+}
+function zeichneKoppel(){
+  const v = $("#v-koppel");
+  v.innerHTML = "";
+  const max = st.ein.max;
+  const quote = st.gesamtN ? Math.round(st.gesamtR/st.gesamtN*100) : 0;
+
+  const kach = el("div","kacheln");
+  kach.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px";
+  const kachel = (z,l) => {
+    const d = el("div","karte"); d.style.cssText = "margin:0;padding:16px";
+    const zz = el("div",null,String(z)); zz.style.cssText = "font-family:var(--display);font-weight:800;font-size:clamp(21px,4.4vw,29px);line-height:1.1;white-space:nowrap;font-variant-numeric:tabular-nums";
+    const ll = el("div",null,l);          ll.style.cssText = "font-family:var(--display);font-weight:700;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:#7a6e5e;margin-top:2px";
+    d.appendChild(zz); d.appendChild(ll); return d;
+  };
+  kach.appendChild(kachel("🔥 " + st.serie, "Tage in Folge"));
+  kach.appendChild(kachel(sicher() + " / " + PLAN.length, "sitzt sicher"));
+  kach.appendChild(kachel(quote + "%", "Trefferquote"));
+  kach.appendChild(kachel(st.gesamtN, "Aufgaben gesamt"));
+  kach.appendChild(kachel(zeitText(uebungsZeit()), "Übungszeit"));
+  kach.appendChild(kachel("🏇 " + st.parcours, "Parcours"));
+  v.appendChild(kach);
+
+  const kk = el("div","karte");
+  kk.appendChild(el("h2",null,"Meine Koppel"));
+  kk.appendChild(el("p","lead","Jedes Feld ist eine Aufgabe. Je öfter sie sitzt, desto grüner wird die Weide."));
+  const scroll = el("div","karte20");
+  const g = el("div","gitter");
+  g.style.gridTemplateColumns = "22px repeat(" + max + ",minmax(15px,1fr))";
+  g.appendChild(el("div","gz",""));
+  for(let b=1;b<=max;b++) g.appendChild(el("div","gz", b%5===0||b===1 ? String(b) : ""));
+  for(let a=1;a<=max;a++){
+    g.appendChild(el("div","gz", a%5===0||a===1 ? String(a) : ""));
+    for(let b=1;b<=max;b++){
+      const f = st.fakten[schluessel(a,b)];
+      const z = el("div","zelle");
+      z.dataset.s = stufeVon(f);
+      z.title = a + " × " + b + " = " + (a*b) + (f ? " — Fach " + f.f + " von " + MEISTER : " — noch nicht dran");
+      g.appendChild(z);
+    }
+  }
+  scroll.appendChild(g);
+  kk.appendChild(scroll);
+  const leg = el("div","legende");
+  [["var(--w0)","noch nicht dran"],["var(--w1)","wackelig"],["var(--w2)","im Aufbau"],["var(--w3)","sitzt"],["var(--w4)","sicher"],["var(--w5)","Meisterfach"]]
+    .forEach(([f,t])=>{ const s=el("span"); const i=el("i"); i.style.background=f; s.appendChild(i); s.appendChild(document.createTextNode(t)); leg.appendChild(s); });
+  kk.appendChild(leg);
+  v.appendChild(kk);
+
+  const rk = el("div","karte");
+  rk.appendChild(el("h2",null,"Reihen"));
+  rk.appendChild(el("p","lead","Wie sicher sitzt jede einzelne Reihe?"));
+  const rg = el("div","reihen");
+  for(let n=1;n<=max;n++){
+    let summe = 0;
+    for(let m=1;m<=max;m++){
+      const f = st.fakten[schluessel(n,m)];
+      summe += f ? Math.min(f.f, MEISTER)/MEISTER : 0;
+    }
+    const pz = Math.round(summe/max*100);
+    const z = el("div","reihe");
+    z.appendChild(el("div","nr", n + "er"));
+    const bahn = el("div","bahn2"); const fuell = el("i");
+    fuell.style.width = pz + "%";
+    fuell.style.background = pz >= 90 ? "var(--weide)" : pz >= 45 ? "var(--heu)" : "var(--schleife)";
+    bahn.appendChild(fuell); z.appendChild(bahn);
+    z.appendChild(el("div","pz", pz + "%"));
+    rg.appendChild(z);
+  }
+  rk.appendChild(rg);
+  v.appendChild(rk);
+
+  const schwer = Object.keys(st.fakten)
+    .filter(k => st.fakten[k].w > 0)
+    .sort((x,y) => (st.fakten[y].w - st.fakten[x].w) || (st.fakten[x].f - st.fakten[y].f))
+    .slice(0,8);
+  if(schwer.length){
+    const sk = el("div","karte");
+    sk.appendChild(el("h2",null,"Knifflige Aufgaben"));
+    sk.appendChild(el("p","lead","Die kommen im Training besonders oft dran."));
+    const box = el("div","knifflig");
+    schwer.forEach(k=>{
+      const [a,b] = k.split(":").map(Number);
+      const d = el("div","k", a + " × " + b + " = " + (a*b));
+      d.appendChild(el("small", null, st.fakten[k].w + "× daneben"));
+      box.appendChild(d);
+    });
+    sk.appendChild(box);
+    v.appendChild(sk);
+  }
+
+  const ck = el("div","karte");
+  ck.appendChild(el("h2",null,"Die letzten 5 Wochen"));
+  ck.appendChild(el("p","lead","Jeder Tag mit Training bekommt eine grüne Weide."));
+  const kal = el("div","kalender");
+  ["M","D","M","D","F","S","S"].forEach(t => kal.appendChild(el("div","kal-kopf",t)));
+  const jetzt = new Date();
+  const start = new Date(jetzt);
+  start.setDate(jetzt.getDate() - ((jetzt.getDay()+6)%7) - 28);
+  for(let i=0;i<35;i++){
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const eintrag = st.tage[tagText(d)];
+    const z = el("div","tag", String(d.getDate()));
+    if(eintrag) z.classList.add(eintrag.n >= 30 ? "viel" : "geuebt");
+    if(tagText(d) === tagText()) z.classList.add("heute");
+    if(d > jetzt) z.style.opacity = ".3";
+    z.title = tagText(d) + (eintrag ? " — " + eintrag.n + " Aufgaben" : " — nicht geübt");
+    kal.appendChild(z);
+  }
+  ck.appendChild(kal);
+  v.appendChild(ck);
+}
+
+/* =================================================================
+   15. Mehr
+   ================================================================= */
+function zeichneMehr(){
+  const v = $("#v-mehr");
+  v.innerHTML = "";
+
+  const k = el("div","karte");
+  k.appendChild(el("h2",null,"Einstellungen"));
+
+  const f1 = el("div","feld");
+  f1.appendChild(el("label",null,"Dein Name"));
+  const inp = document.createElement("input");
+  inp.type = "text"; inp.value = st.name; inp.placeholder = "z. B. Mia"; inp.maxLength = 20;
+  inp.oninput = () => { st.name = inp.value; sichern(); };
+  f1.appendChild(inp);
+  k.appendChild(f1);
+
+  const gruppe = (titel, werte, ist, setzen, hinweis) => {
+    const f = el("div","feld");
+    f.appendChild(el("label",null,titel));
+    const w = el("div","wahl");
+    werte.forEach(([val,txt])=>{
+      const b = el("button", ist===val ? "an" : "", txt);
+      b.onclick = () => { setzen(val); sichern(); zeichneMehr(); zeichneStart(); kopfAktualisieren(); };
+      w.appendChild(b);
+    });
+    f.appendChild(w);
+    if(hinweis) f.appendChild(el("div","hinweis",hinweis));
+    k.appendChild(f);
+  };
+  gruppe("Wie lange dauert eine Runde?", [[3,"3 Minuten"],[5,"5 Minuten"],[10,"10 Minuten"]],
+         st.ein.minuten, v => st.ein.minuten = v);
+  gruppe("Neue Aufgaben pro Runde", [[3,"3"],[6,"6"],[10,"10"]],
+         st.ein.neuProRunde, v => st.ein.neuProRunde = v,
+         "Weniger neue Aufgaben heißt mehr Wiederholung. 6 ist ein guter Start.");
+  gruppe("Zahlenraum", [[10,"bis 10×10"],[12,"bis 12×12"],[15,"bis 15×15"],[20,"bis 20×20"]],
+         st.ein.max, v => { st.ein.max = v; PLAN = lehrplan(v); st.eingefuehrt = 0; },
+         "Neue Aufgaben kommen sowieso Schritt für Schritt dazu — das hier ist nur die Obergrenze.");
+  gruppe("Ton", [[true,"An"],[false,"Aus"]], st.ein.ton, v => st.ein.ton = v);
+  v.appendChild(k);
+
+  const e = el("div","karte");
+  e.appendChild(el("h2",null,"Wie das Training denkt"));
+  const ul = document.createElement("ul");
+  ul.style.cssText = "margin:0;padding-left:20px;color:#5a5044;font-size:14.5px;line-height:1.7";
+  [
+   "Jede Aufgabe wandert durch acht Fächer. Richtig und flott → ein Fach weiter, blitzschnell → zwei. Sie kommt dann erst nach 1, 2, 4, 8, 16, 32 oder 60 Tagen wieder dran.",
+   "Falsch → zwei Fächer zurück, und sie taucht noch in derselben Runde wieder auf.",
+   "Neue Aufgaben werden zuerst ohne Vorsagen gefragt. Wer sie auf Anhieb kann, überspringt gleich mehrere Fächer — das spart Zeit für die kniffligen.",
+   "Bei einem Fehler kommt das Ergebnis mit Rechentrick und einem Bild dazu: kleine Aufgaben als abzählbares Feld, große als zerlegtes Rechteck (17×6 = 10×6 + 7×6).",
+   "Die Reihenfolge geht von leicht nach schwer: erst 1, 2, 5, 10, dann 11 und 20, danach 3, 4, 9, 6, 8, 7 und zuletzt 12 bis 19.",
+   "7 × 8 und 8 × 7 zählen als eine Aufgabe, werden aber in beiden Richtungen gefragt — deshalb sind es 210 statt 400."
+  ].forEach(t => { const li = document.createElement("li"); li.textContent = t; li.style.marginBottom = "7px"; ul.appendChild(li); });
+  e.appendChild(ul);
+  v.appendChild(e);
+
+  const d = el("div","karte");
+  d.appendChild(el("h2",null,"Fortschritt sichern"));
+  d.appendChild(el("p","lead", Ablage.dauerhaft
+    ? "Der Fortschritt liegt in diesem Browser. Eine Sicherungsdatei — sie enthält auch die Fotos — schützt vor Datenverlust und bringt alles auf ein anderes Gerät."
+    : "⚠️ Dieser Browser speichert nichts. Sichere den Fortschritt als Datei, sonst ist er beim nächsten Laden verloren."));
+
+  const dz = el("div","knopf-reihe");
+  const bs = el("button","knopf schmal","💾 Als Datei sichern");
+  bs.onclick = async () => { bs.textContent = await alsDateiSichern(); setTimeout(()=>{ bs.textContent = "💾 Als Datei sichern"; }, 2200); };
+  const bo = el("button","knopf schmal","📂 Aus Datei laden");
+  bo.onclick = () => dateiWaehlen(datei => ausDateiLaden(datei, meldung => {
+    bo.textContent = meldung;
+    setTimeout(()=>{ bo.textContent = "📂 Aus Datei laden"; if(meldung[0]==="✅") zeichneMehr(); }, 1600);
+  }));
+  dz.appendChild(bs); dz.appendChild(bo);
+  d.appendChild(dz);
+
+  const wo = el("div", null, "Auf dem iPad landet die Datei in „Downloads“ und lässt sich von dort nach iCloud verschieben.");
+  wo.style.cssText = "font-size:12.5px;color:#7a6e5e;margin:10px 0 14px";
+  d.appendChild(wo);
+
+  const det = document.createElement("details");
+  det.appendChild(el("summary",null,"Daten anzeigen"));
+  const ta = document.createElement("textarea");
+  ta.value = JSON.stringify(st); ta.style.marginTop = "10px";
+  det.appendChild(ta);
+  const rz = el("div","knopf-reihe"); rz.style.marginTop = "10px";
+  const bk = el("button","knopf schmal","📋 Kopieren");
+  bk.onclick = async () => {
+    try{ await navigator.clipboard.writeText(ta.value); bk.textContent = "✅ Kopiert"; }
+    catch(err){ ta.select(); bk.textContent = "Bitte von Hand kopieren"; }
+    setTimeout(()=>{ bk.textContent = "📋 Kopieren"; }, 2000);
+  };
+  const bi = el("button","knopf schmal","⬆️ Einfügen & laden");
+  bi.onclick = () => {
+    try{
+      const neu = JSON.parse(ta.value);
+      if(!neu || typeof neu !== "object" || !neu.fakten) throw new Error("Format");
+      st = Object.assign(frisch(), neu);
+      st.ein = Object.assign(frisch().ein, neu.ein||{});
+      if(!Array.isArray(st.ponys) || !st.ponys.length) st.ponys = ["paula"];
+      PLAN = lehrplan(st.ein.max);
+      sichern(); kopfAktualisieren(); zeichneMehr(); zeichneStart();
+      bi.textContent = "✅ Geladen";
+    }catch(err){ bi.textContent = "❌ Passt nicht"; }
+    setTimeout(()=>{ bi.textContent = "⬆️ Einfügen & laden"; }, 2200);
+  };
+  rz.appendChild(bk); rz.appendChild(bi);
+  det.appendChild(rz);
+  d.appendChild(det);
+
+  const bl = el("button","knopf schmal","Alles zurücksetzen");
+  bl.style.marginTop = "12px";
+  bl.onclick = () => {
+    if(confirm("Wirklich den gesamten Fortschritt löschen? Fotos bleiben erhalten.")){
+      st = frisch(); PLAN = lehrplan(st.ein.max);
+      sichern(); kopfAktualisieren(); zeichneMehr(); zeichneStart();
+    }
+  };
+  d.appendChild(bl);
+  v.appendChild(d);
+}
+
+/* =================================================================
+   16. Navigation & Eingaben
+   ================================================================= */
+function zeigeAnsicht(name){
+  if(R && name !== "reiten"){
+    if(!confirm("Die laufende Runde wird beendet. Weiter?")) return;
+    beendeRunde();
+  }
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("is-on", t.dataset.view === name));
+  $("#v-reiten").hidden = name !== "reiten";
+  $("#v-stall").hidden  = name !== "stall";
+  $("#v-koppel").hidden = name !== "koppel";
+  $("#v-mehr").hidden   = name !== "mehr";
+  $("#app").classList.toggle("weit", name === "koppel" || name === "stall");
+  if(name === "stall")  zeichneStall();
+  if(name === "koppel") zeichneKoppel();
+  if(name === "mehr")   zeichneMehr();
+  if(name === "reiten") zeichneStart();
+  scrollTo({top:0, behavior:"smooth"});
+}
+
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => zeigeAnsicht(t.dataset.view));
+$("#schlussKnopf").onclick = beendeRunde;
+$("#tonKnopf").onclick = () => { st.ein.ton = !st.ein.ton; sichern(); kopfAktualisieren(); if(st.ein.ton) ton(880,.1); };
+$("#tippKnopf").onclick = () => {
+  if(!karte || gesperrt) return;
+  tippGenutzt = true;
+  zeigeHilfe(karte.a, karte.b);
+};
+$("#aufgabe").addEventListener("click", () => {
+  if(gesperrt && R && Date.now() - feedbackSeit > 600){ clearTimeout(weiterTimer); naechsteKarte(); }
+});
+$("#tastenfeld").addEventListener("click", ev => {
+  const b = ev.target.closest(".taste");
+  if(!b) return;
+  const t = b.dataset.t;
+  if(t === "ok") pruefe();
+  else if(t === "weg") loesche();
+  else tippe(t);
+});
+addEventListener("keydown", ev => {
+  if($("#spielKarte").hidden) return;
+  if(document.activeElement && document.activeElement.tagName === "INPUT") return;
+  if(ev.key >= "0" && ev.key <= "9"){ tippe(ev.key); ev.preventDefault(); }
+  else if(ev.key === "Backspace"){ loesche(); ev.preventDefault(); }
+  else if(ev.key === "Enter" || ev.key === " "){ pruefe(); ev.preventDefault(); }
+});
+let versteckSeit = 0;
+document.addEventListener("visibilitychange", () => {
+  if(!R) return;
+  if(document.hidden) versteckSeit = Date.now();
+  else if(versteckSeit){ R.endeUm += Date.now() - versteckSeit; versteckSeit = 0; }
+});
+
+/* =================================================================
+   17. Sicherung als Datei
+   ================================================================= */
+function sicherungsText(){
+  return JSON.stringify({app:"zahlenpferd", v:2, stand:st, album:album});
+}
+async function alsDateiSichern(){
+  const text = sicherungsText();
+  const name = "zahlenpferd-" + tagText() + ".json";
+  // In der Artefakt-Ansicht ist der seiteneigene Download gesperrt; dort
+  // übernimmt die Downloads-Fähigkeit des Betrachters, sofern vorhanden.
+  try{
+    if(window.claude && typeof window.claude.use === "function"){
+      const dl = await window.claude.use("downloads");
+      if(dl){ await dl.save({filename:name, data:text}); return "✅ Gesichert"; }
+    }
+  }catch(e){ return "❌ Abgebrochen"; }
+  try{
+    const url = URL.createObjectURL(new Blob([text], {type:"application/json"}));
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+    return "✅ Gesichert";
+  }catch(e){ return "❌ Ging nicht"; }
+}
+function ausDateiLaden(datei, fertig){
+  const leser = new FileReader();
+  leser.onerror = () => fertig("❌ Nicht lesbar");
+  leser.onload = () => {
+    try{
+      const d = JSON.parse(leser.result);
+      const stand = d && d.stand ? d.stand : d;      // auch die reine Fortschrittsform
+      if(!stand || !stand.fakten) throw new Error("Format");
+      st = Object.assign(frisch(), stand);
+      st.ein = Object.assign(frisch().ein, stand.ein||{});
+      if(!Array.isArray(st.ponys) || !st.ponys.length) st.ponys = ["paula"];
+      if(d && Array.isArray(d.album) && d.album.length){ album = d.album; albumSichern(); }
+      PLAN = lehrplan(st.ein.max);
+      sichern(); kopfAktualisieren(); zeichneStart(); zeigeBaender();
+      fertig("✅ Geladen");
+    }catch(e){ fertig("❌ Passt nicht"); }
+  };
+  leser.readAsText(datei);
+}
+function dateiWaehlen(beiAuswahl){
+  const w = document.createElement("input");
+  w.type = "file"; w.accept = "application/json,.json";
+  w.onchange = () => { if(w.files && w.files[0]) beiAuswahl(w.files[0]); };
+  w.click();
+}
+
+const alsApp = () => navigator.standalone === true ||
+  (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
+const aufApple = () => /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+function zeigeBaender(){
+  const box = $("#baender");
+  box.innerHTML = "";
+
+  if(!Ablage.dauerhaft){
+    const b = el("div","band warnung");
+    b.appendChild(el("b", null, "⚠️ Hier wird nichts gespeichert"));
+    b.appendChild(el("div", null, Ablage.art === "nur diese Sitzung"
+      ? "Dieser Reiter merkt sich den Fortschritt nur, solange er offen bleibt. Lädt die Seite neu, ist er weg."
+      : "Diese Ansicht darf keinen Fortschritt speichern. Öffne das Zahlenpferd über das Symbol auf dem Home-Bildschirm — dort bleibt alles erhalten."));
+    const k = el("button","knopf schmal","💾 Fortschritt als Datei sichern");
+    k.onclick = async () => { k.textContent = await alsDateiSichern(); setTimeout(()=>{ k.textContent = "💾 Fortschritt als Datei sichern"; }, 2200); };
+    b.appendChild(k);
+    box.appendChild(b);
+    return;
+  }
+
+  if(aufApple() && !alsApp() && !st.homeTippWeg && st.runden >= 1){
+    const b = el("div","band tipp-band");
+    b.appendChild(el("b", null, "📲 Aufs Home-Bildschirm legen"));
+    b.appendChild(el("div", null, "Tippe unten auf „Teilen“ und dann auf „Zum Home-Bildschirm“. Das Zahlenpferd startet danach wie eine echte App — und iOS räumt den Fortschritt nicht mehr weg."));
+    const k = el("button","knopf schmal","Verstanden");
+    k.onclick = () => { st.homeTippWeg = true; sichern(); zeigeBaender(); };
+    b.appendChild(k);
+    box.appendChild(b);
+  }
+}
+
+/* =================================================================
+   18. Start
+   ================================================================= */
+if(st.letzterTag !== null && st.letzterTag < HEUTE() - 1) st.serie = 0;
+kopfAktualisieren();
+zeichneStart();
+zeigeBaender();
+</script>
+</body>
+</html>
