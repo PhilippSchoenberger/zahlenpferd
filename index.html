@@ -247,7 +247,13 @@ canvas#konfetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:non
 .box.aktiv{background:#dff3e3;box-shadow:3px 3px 0 var(--weide),0 0 0 2.5px var(--weide)}
 .box svg{width:100%;height:auto;display:block}
 .box.zu svg{opacity:.16;filter:grayscale(1)}
-.box .n{font-family:var(--display);font-weight:800;font-size:14.5px;margin-top:4px}
+.box .name-zeile{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:4px;min-height:22px}
+.box .n{font-family:var(--display);font-weight:800;font-size:14.5px}
+.box .stift{border:none;background:none;cursor:pointer;font-size:12px;line-height:1;padding:3px;border-radius:7px;opacity:.5;flex:none}
+.box .stift:hover,.box .stift:active{opacity:1;background:var(--papier)}
+.box .haken{opacity:1;font-size:14px;color:var(--weide)}
+.box .name-feld{width:100%;font-family:var(--display);font-weight:800;font-size:14px;text-align:center;
+  border:2px solid var(--tinte);border-radius:10px;padding:3px 6px;background:var(--papier);box-shadow:none}
 .box .b{font-size:11px;color:#7a6e5e;line-height:1.35;margin-top:2px}
 .box .marke{font-family:var(--display);font-weight:800;font-size:11px;color:var(--weide);margin-top:3px}
 
@@ -455,7 +461,7 @@ const PARCOURS = 15;                        // richtige Antworten je Parcoursrun
 
 function frisch(){
   return {
-    v:2, name:"", ponyName:"", pony:"paula", xp:0,
+    v:2, name:"", ponyNamen:{}, pony:"paula", xp:0,
     fakten:{},                 // "a:b" -> {f:Fach, d:Fälligkeitstag, n, r, w, best}
     eingefuehrt:0,
     tage:{},                   // "JJJJ-MM-TT" -> {s:Sekunden, n:Aufgaben, r:richtig}
@@ -506,6 +512,13 @@ function laden(){
     const s = Object.assign(frisch(), d);
     s.ein = Object.assign(frisch().ein, d.ein||{});
     if(!Array.isArray(s.ponys) || !s.ponys.length) s.ponys = ["paula"];
+    if(!s.ponyNamen || typeof s.ponyNamen !== "object") s.ponyNamen = {};
+    // Früher gab es nur einen Namen für alle Ponys — der gehört jetzt dem,
+    // das damals geritten wurde.
+    if(typeof d.ponyName === "string" && d.ponyName.trim() && !Object.keys(s.ponyNamen).length){
+      s.ponyNamen[s.pony] = d.ponyName.trim();
+    }
+    delete s.ponyName;
     return s;
   }catch(e){ return frisch(); }
 }
@@ -668,6 +681,9 @@ const PONYS = [
   {id:"stern",   name:"Stern",   fell:"#f3e2f2", maehne:"#d98cc8", blesse:1, horn:1, art:"Einhorn", frei:()=>sicher()>=PLAN.length, wie:"Alle Aufgaben sicher können"}
 ];
 const ponyVon = id => PONYS.find(p=>p.id===id) || PONYS[0];
+/* Jedes Pony darf seinen eigenen Namen bekommen. Ohne eigenen bleibt der,
+   mit dem es in den Stall gekommen ist. */
+const ponyName = id => ((st.ponyNamen && st.ponyNamen[id]) || "").trim() || ponyVon(id).name;
 function reiheSicherIrgendeine(){
   for(let n=1;n<=st.ein.max;n++) if(reiheSicher(n)) return true;
   return false;
@@ -1170,7 +1186,7 @@ function zeigeEnde(runde, neueSchleifen, neuePonys, aufgestiegen, rangJetzt){
   const k = $("#endKarte");
   k.hidden = false; k.innerHTML = "";
   const quote = runde.n ? Math.round(runde.r/runde.n*100) : 0;
-  const pName = st.ponyName.trim() || ponyVon(st.pony).name;
+  const pName = ponyName(st.pony);
 
   let titel = "Abgesattelt!";
   if(runde.n === 0) titel = "Noch nichts geritten 🤔";
@@ -1275,7 +1291,7 @@ function zeichneStart(){
   const heuteSchon = st.tage[tagText()];
   const name = st.name.trim();
   const pony = ponyVon(st.pony);
-  const pName = st.ponyName.trim() || pony.name;
+  const pName = ponyName(st.pony);
 
   const buehne = el("div","pony-buehne");
   const bild = el("div","bild"); bild.innerHTML = ponySVG(pony);
@@ -1313,6 +1329,52 @@ function zeichneStart(){
 /* =================================================================
    12. Stall
    ================================================================= */
+/* Leerer Name heißt: zurück zum Stallnamen. */
+function setzeName(id, wert){
+  const sauber = (wert || "").trim().slice(0,18);
+  if(sauber && sauber !== ponyVon(id).name) st.ponyNamen[id] = sauber;
+  else delete st.ponyNamen[id];
+  sichern();
+  if(id === st.pony) kopfAktualisieren();
+}
+/* Name direkt in der Stallbox ändern, ohne die Box auszuwählen.
+   Übernommen wird ausdrücklich per Enter oder Haken — nicht nur über blur,
+   das je nach Gerät gar nicht zuverlässig kommt. */
+function nameBearbeiten(p, zeile){
+  zeile.innerHTML = "";
+  let erledigt = false;
+  const inp = document.createElement("input");
+  inp.type = "text"; inp.className = "name-feld";
+  inp.value = st.ponyNamen[p.id] || "";
+  inp.placeholder = p.name; inp.maxLength = 18;
+  inp.setAttribute("aria-label", "Neuer Name für " + p.name);
+
+  const fertig = uebernehmen => {
+    if(erledigt) return;
+    erledigt = true;
+    if(uebernehmen) setzeName(p.id, inp.value);
+    zeichneStall(); zeichneStart();
+  };
+  inp.onclick = ev => ev.stopPropagation();
+  inp.onkeydown = ev => {
+    ev.stopPropagation();
+    if(ev.key === "Enter"){ ev.preventDefault(); fertig(true); }
+    else if(ev.key === "Escape"){ ev.preventDefault(); fertig(false); }
+  };
+  inp.onblur = () => fertig(true);
+
+  const haken = el("button","stift haken","✓");
+  haken.title = "Namen übernehmen";
+  haken.setAttribute("aria-label", "Namen übernehmen");
+  // mousedown statt click: sonst nimmt blur dem Knopf die Reihenfolge weg
+  haken.onmousedown = ev => { ev.preventDefault(); ev.stopPropagation(); fertig(true); };
+  haken.onclick = ev => { ev.preventDefault(); ev.stopPropagation(); };
+
+  zeile.appendChild(inp);
+  zeile.appendChild(haken);
+  inp.focus(); inp.select();
+}
+
 function zeichneStall(){
   const v = $("#v-stall");
   v.innerHTML = "";
@@ -1323,17 +1385,19 @@ function zeichneStall(){
   const buehne = el("div","pony-buehne");
   const bild = el("div","bild"); bild.style.width = "140px"; bild.innerHTML = ponySVG(pony);
   const txt = el("div");
-  txt.appendChild(el("p","pony-name", st.ponyName.trim() || pony.name));
+  txt.appendChild(el("p","pony-name", ponyName(st.pony)));
   txt.appendChild(el("p","pony-sub", pony.art + " · " + st.ponys.length + " von " + PONYS.length + " Ponys im Stall"));
   buehne.appendChild(bild); buehne.appendChild(txt);
   k.appendChild(buehne);
 
   const f = el("div","feld"); f.style.marginTop = "12px";
-  f.appendChild(el("label",null,"Wie soll dein Pony heißen?"));
+  f.appendChild(el("label",null,"Wie soll " + ponyName(st.pony) + " heißen?"));
   const inp = document.createElement("input");
-  inp.type = "text"; inp.value = st.ponyName; inp.placeholder = pony.name; inp.maxLength = 18;
-  inp.oninput = () => { st.ponyName = inp.value; sichern(); };
+  inp.type = "text"; inp.value = st.ponyNamen[st.pony] || ""; inp.placeholder = pony.name; inp.maxLength = 18;
+  inp.oninput = () => { setzeName(st.pony, inp.value); };
+  inp.onblur = () => zeichneStall();
   f.appendChild(inp);
+  f.appendChild(el("div","hinweis","Jedes Pony im Stall darf einen eigenen Namen haben — tippe dort auf den Stift."));
   k.appendChild(f);
   v.appendChild(k);
 
@@ -1345,7 +1409,18 @@ function zeichneStall(){
     const hat = st.ponys.indexOf(p.id) >= 0;
     const d = el("div","box" + (hat ? "" : " zu") + (st.pony===p.id ? " aktiv" : ""));
     d.innerHTML = ponySVG(p);
-    d.appendChild(el("div","n", hat ? p.name : "???"));
+
+    const zeile = el("div","name-zeile");
+    zeile.appendChild(el("div","n", hat ? ponyName(p.id) : "???"));
+    if(hat){
+      const stift = el("button","stift","✏️");
+      stift.title = "Namen ändern";
+      stift.setAttribute("aria-label", ponyName(p.id) + " umbenennen");
+      stift.onclick = ev => { ev.stopPropagation(); nameBearbeiten(p, zeile); };
+      zeile.appendChild(stift);
+    }
+    d.appendChild(zeile);
+
     d.appendChild(el("div","b", hat ? p.art : p.wie));
     if(hat && st.pony===p.id) d.appendChild(el("div","marke","reitet gerade"));
     if(hat){
