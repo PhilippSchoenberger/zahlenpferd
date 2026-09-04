@@ -1114,8 +1114,8 @@ function fuelleWarteschlange(erst){
 function starteRunde(){
   ac();
   R = {queue:[], n:0, r:0, combo:0, comboBest:0, xp:0, neuHeute:0, runden:0, imParcours:0,
-       endeUm: Date.now() + st.ein.minuten*60000, start: Date.now(), letzterK:null,
-       pause:false, pauseSeit:0, pauseGesamt:0, memoryGezeigt:false};
+       restMs: st.ein.minuten*60000, letzterTick: Date.now(), start: Date.now(), letzterK:null,
+       pause:false, memoryGezeigt:false};
   M = null;
   $("#memorySpiel").hidden = true;
   $("#aufgabe").hidden = false;
@@ -1131,6 +1131,7 @@ function starteRunde(){
   $("#spielKarte").hidden = false;
   baueBahn();
   aktualisiereHud();
+  clearInterval(uhrId);            // niemals zwei Uhren gleichzeitig
   uhrId = setInterval(tick, 250);
   naechsteKarte();
 }
@@ -1162,21 +1163,29 @@ function bewegeLaeufer(){
   });
 }
 
+/* Die Uhr zählt nur, was wirklich gespielt wird. Früher lief sie nach der
+   Wanduhr weiter — ein App-Wechsel, eine Mitteilung oder ein gesperrtes iPad
+   haben die Runde dann im Hintergrund beendet, obwohl kaum jemand geübt hat.
+   Jede Lücke ist auf einen Tick gedeckelt und fällt damit nicht ins Gewicht. */
 function tick(){
-  if(R.pause) return;                              // Erklärung wird gelesen
-  const rest = (R.endeUm - Date.now())/1000;
+  const jetzt = Date.now();
+  const schritt = Math.min(jetzt - R.letzterTick, 1000);
+  R.letzterTick = jetzt;
+  if(R.pause || document.hidden) return;           // Lesepause, Memory oder weggelegt
+  R.restMs -= schritt;
+  const rest = R.restMs/1000;
   $("#uhr").textContent = mmss(rest);
   const bar = $("#zeitbalken");
   bar.firstElementChild.style.width = Math.max(0, Math.min(100, rest/(st.ein.minuten*60)*100)) + "%";
   bar.classList.toggle("knapp", rest <= 30);
-  if(rest <= 0) beendeRunde();
+  if(R.restMs <= 0) beendeRunde();
 }
 
 function naechsteKarte(){
   if(!R || M) return;
-  if(Date.now() >= R.endeUm){ beendeRunde(); return; }
+  if(R.restMs <= 0){ beendeRunde(); return; }
   // Zur Halbzeit einmal Memory — zwischen zwei Aufgaben, nie mittendrin.
-  if(st.ein.memory && !R.memoryGezeigt && (R.endeUm - Date.now()) <= st.ein.minuten*30000){
+  if(st.ein.memory && !R.memoryGezeigt && R.restMs <= st.ein.minuten*30000){
     R.memoryGezeigt = true;
     starteMemory();
     return;
@@ -1291,7 +1300,7 @@ function pruefe(){
    damit sie nicht als Übungszeit in der Statistik landet. */
 function pausiere(){
   if(!R || R.pause) return;
-  R.pause = true; R.pauseSeit = Date.now();
+  R.pause = true;
   $("#zeitbalken").classList.add("pausiert");
   $("#uhr").classList.add("pausiert");
   $("#uhr").textContent = "Pause";
@@ -1299,10 +1308,8 @@ function pausiere(){
 function weiterMachen(){
   if(!R) return;
   if(R.pause){
-    const dauer = Date.now() - R.pauseSeit;
-    R.endeUm += dauer;
-    R.pauseGesamt += dauer;
     R.pause = false;
+    R.letzterTick = Date.now();      // die Lesezeit zählt nicht als Übungszeit
     $("#zeitbalken").classList.remove("pausiert");
     $("#uhr").classList.remove("pausiert");
   }
@@ -1344,10 +1351,9 @@ function beendeRunde(){
   if(!R) return;
   clearInterval(uhrId); uhrId = null;
   clearTimeout(weiterTimer); weiterTimer = null;
-  // Lesepausen zählen nicht als Übungszeit
-  const pauseJetzt = R.pause ? Date.now() - R.pauseSeit : 0;
-  const dauer = Math.min(Date.now() - R.start - R.pauseGesamt - pauseJetzt,
-                         st.ein.minuten*60000 + 60000);
+  // Was die Uhr abgezählt hat, ist genau die gespielte Zeit — Lesepausen,
+  // Memory und Zeit im Hintergrund sind darin schon nicht enthalten.
+  const dauer = Math.max(0, st.ein.minuten*60000 - R.restMs);
   const runde = {n:R.n, r:R.r, xp:R.xp, comboBest:R.comboBest, neu:R.neuHeute,
                  parcours:R.runden, sek:Math.round(dauer/1000)};
   const rangVorher = rang(st.xp - R.xp);
@@ -2032,11 +2038,10 @@ addEventListener("keydown", ev => {
   else if(ev.key === "Backspace"){ loesche(); ev.preventDefault(); }
   else if(ev.key === "Enter" || ev.key === " "){ pruefe(); ev.preventDefault(); }
 });
-let versteckSeit = 0;
 document.addEventListener("visibilitychange", () => {
-  if(!R || R.pause) return;          // in der Lesepause steht die Uhr ohnehin
-  if(document.hidden) versteckSeit = Date.now();
-  else if(versteckSeit){ R.endeUm += Date.now() - versteckSeit; versteckSeit = 0; }
+  // Die Uhr rechnet ohnehin nur gespielte Zeit; hier wird lediglich der
+  // Anker nachgezogen, damit der erste Tick nach der Rückkehr sauber ist.
+  if(R) R.letzterTick = Date.now();
 });
 
 /* =================================================================
